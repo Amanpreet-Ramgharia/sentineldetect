@@ -130,7 +130,12 @@ export default function GeneratePage() {
       const res = await fetch('/api/convert', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'improve', rule, improvements:improveOpts, custom_instructions:customImprove}) })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      setRule(data.rule); setModelUsed(data.model_used); setShowImprove(false); setImproveOpts([]); setCustomImprove('')
+      // Validate response has the KQL/rule content before replacing
+      if (!data.rule?.rule) throw new Error('Improvement returned an empty rule. Please try again.')
+      // Merge improved fields but keep existing ones as fallback
+      setRule(prev => prev ? { ...prev, ...data.rule, rule: data.rule.rule } : data.rule)
+      setModelUsed(data.model_used)
+      setShowImprove(false); setImproveOpts([]); setCustomImprove('')
     } catch(e: unknown) { setError(e instanceof Error ? e.message : 'Improvement failed') }
     finally { setImproving(false) }
   }
@@ -154,7 +159,9 @@ export default function GeneratePage() {
       const res = await fetch('/api/convert', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'convert', rule, to_platform:toPlatform}) })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      setRule(data.rule); setModelUsed(data.model_used)
+      if (!data.rule?.rule) throw new Error('Conversion returned an empty rule. Please try again.')
+      setRule(prev => prev ? { ...prev, ...data.rule, rule: data.rule.rule } : data.rule)
+      setModelUsed(data.model_used)
     } catch(e: unknown) { setError(e instanceof Error ? e.message : 'Convert failed') }
     finally { setConverting(false) }
   }

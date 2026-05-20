@@ -119,7 +119,14 @@ export default function GeneratePage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error||'Generation failed')
       setRule(data.rule); setModelUsed(data.model_used)
-    } catch(e: unknown) { setError(e instanceof Error ? e.message : 'Generation failed') }
+    } catch(e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Generation failed'
+      if (msg.includes('sign in') || msg.includes('Session expired')) {
+        setError('Your session expired. Please refresh the page and try again.')
+      } else {
+        setError(msg)
+      }
+    }
     finally { setLoading(false) }
   }
 

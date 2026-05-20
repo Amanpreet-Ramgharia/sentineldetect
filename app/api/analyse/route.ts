@@ -7,8 +7,15 @@ import type { AnalyseRequest, LogAnalysis } from '@/lib/types'
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+    let user = null
+    try {
+      const { data } = await supabase.auth.getUser()
+      user = data.user
+    } catch {
+      const { data } = await supabase.auth.getSession()
+      user = data.session?.user ?? null
+    }
+    if (!user) return NextResponse.json({ error: 'Session expired — please sign in again' }, { status: 401 })
 
     const body: AnalyseRequest = await req.json()
     const { log, format, provider = 'gemini' } = body

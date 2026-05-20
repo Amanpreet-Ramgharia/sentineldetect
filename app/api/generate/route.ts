@@ -7,8 +7,17 @@ import type { GenerateRequest, DetectionRule } from '@/lib/types'
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Please sign in' }, { status: 401 })
+    // Try getUser first (validates with Supabase server)
+    // Fall back to getSession (reads local JWT) if network issue
+    let user = null
+    try {
+      const { data } = await supabase.auth.getUser()
+      user = data.user
+    } catch {
+      const { data } = await supabase.auth.getSession()
+      user = data.session?.user ?? null
+    }
+    if (!user) return NextResponse.json({ error: 'Session expired — please sign in again' }, { status: 401 })
 
     const body: GenerateRequest = await req.json()
     const { scenario, platform, focus, provider = 'gemini' } = body

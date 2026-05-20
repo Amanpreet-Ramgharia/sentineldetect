@@ -15,9 +15,12 @@ const NAV = [
   { href:'/threats',      label:'Live Threats'    },
   { href:'/templates',    label:'Templates'       },
   { href:'/integrations', label:'Integrations'    },
+  { href:'/api-docs',     label:'API Access'      },
   { href:'/teams',        label:'Teams'           },
   { href:'/settings',     label:'Settings'        },
 ]
+
+const BUG_URL = 'https://github.com/Amanpreet-Ramgharia/sentineldetect/issues/new?template=bug_report.md&title=Bug+report&body=**Page:**%0A%0A**What+happened:**%0A%0A**Expected+behaviour:**%0A%0A**Steps+to+reproduce:**%0A'
 
 const THEMES: { value: Theme; label: string }[] = [
   { value:'cyber',    label:'Cyber Slate'   },
@@ -109,8 +112,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </select>
         </div>
 
+        {/* Attribution */}
+        <div style={{ padding:'.6rem .85rem', borderTop:'1px solid var(--border)', background:'rgba(249,115,22,.03)' }}>
+          <div style={{ fontSize:'.62rem', color:'var(--muted2)', marginBottom:'.3rem' }}>Built by</div>
+          <div style={{ fontSize:'.72rem', fontWeight:600, color:'var(--text)', marginBottom:'.35rem' }}>Amanpreet Singh Matharu</div>
+          <div style={{ display:'flex', gap:'.75rem' }}>
+            <a href="https://www.linkedin.com/in/amanpreets94/" target="_blank" rel="noopener" style={{ fontSize:'.65rem', color:'#f97316', textDecoration:'none' }}>LinkedIn</a>
+            <a href="https://github.com/Amanpreet-Ramgharia/sentineldetect" target="_blank" rel="noopener" style={{ fontSize:'.65rem', color:'var(--muted)', textDecoration:'none' }}>GitHub</a>
+            <a href={BUG_URL} target="_blank" rel="noopener" style={{ fontSize:'.65rem', color:'var(--muted)', textDecoration:'none' }}>Report bug</a>
+          </div>
+        </div>
+
         {/* User */}
-        <div style={{ padding:'.75rem .85rem', borderTop:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+        <div style={{ padding:'.65rem .85rem', borderTop:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
           <span style={{ fontSize:'.72rem', color:'var(--muted)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>{userName}</span>
           <button onClick={signOut} style={{ background:'none', border:'none', cursor:'pointer', fontSize:'.72rem', color:'var(--muted2)', padding:'.2rem .3rem', borderRadius:4, fontFamily:'inherit' }}
             onMouseEnter={e => (e.target as HTMLElement).style.color='var(--red)'}

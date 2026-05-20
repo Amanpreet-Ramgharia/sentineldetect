@@ -13,7 +13,7 @@ export default function ForgotPasswordPage() {
     e.preventDefault()
     setLoading(true); setError('')
     const { error } = await createClient().auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${"https://smartswingalerts.com"}/reset-password`,
     })
     if (error) { setError(error.message); setLoading(false) }
     else setSent(true)

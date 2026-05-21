@@ -21,7 +21,16 @@ const TEMPLATES = [
   { label:'Data Exfiltration', text:'Detect large data exfiltration — a process uploading more than 500MB to an external IP within 30 minutes' },
 ]
 
-const PLATFORMS: Platform[] = ['Microsoft Sentinel (KQL)', 'Splunk (SPL)', 'Elastic (EQL)']
+const PLATFORMS: Platform[] = [
+  'Microsoft Sentinel (KQL)',
+  'Microsoft Defender XDR (KQL)',
+  'Splunk (SPL)',
+  'Elastic (EQL)',
+  'AWS CloudWatch Insights',
+  'Google Chronicle (YARA-L)',
+  'IBM QRadar (AQL)',
+  'Wazuh (XML)',
+]
 
 const IMPROVE_OPTIONS = [
   'Reduce false positives',

@@ -17,7 +17,7 @@ export default function SignupPage() {
     setLoading(true); setError('')
     const { error } = await createClient().auth.signUp({
       email, password,
-      options: { data: { full_name: name }, emailRedirectTo: `${"https://smartswingalerts.com"}/home` },
+      options: { data: { full_name: name }, emailRedirectTo: `${window.location.origin}/home` },
     })
     if (error) { setError(error.message); setLoading(false) }
     else setDone(true)
@@ -50,6 +50,19 @@ export default function SignupPage() {
                     style={inpStyle}
                     onFocus={(e: React.FocusEvent<HTMLInputElement>) => e.target.style.borderColor='rgba(249,115,22,.5)'}
                     onBlur={(e: React.FocusEvent<HTMLInputElement>) => e.target.style.borderColor='var(--border2)'}/>
+                  {type === 'password' && val && (() => {
+                    const strength = [val.length >= 8, /[A-Z]/.test(val), /[0-9]/.test(val), /[^A-Za-z0-9]/.test(val)].filter(Boolean).length
+                    const labels = ['Weak','Fair','Good','Strong']
+                    const colors = ['var(--red)','#f97316','var(--blue)','var(--green)']
+                    return (
+                      <div style={{ marginTop:'.3rem' }}>
+                        <div style={{ display:'flex', gap:3 }}>
+                          {[1,2,3,4].map(i => <div key={i} style={{ flex:1, height:3, borderRadius:2, background:i<=strength?colors[strength-1]:'var(--bg3)', transition:'all .2s' }}/>)}
+                        </div>
+                        <div style={{ fontSize:'.65rem', color:colors[strength-1], marginTop:'.2rem' }}>{labels[strength-1]} password{strength < 3 ? ' — add uppercase, numbers, or symbols' : ''}</div>
+                      </div>
+                    )
+                  })()}
                 </div>
               ))}
               {error && <div style={{ background:'var(--red-bg)', border:'1px solid var(--red-bd)', borderRadius:7, padding:'.55rem .8rem', fontSize:'.78rem', color:'var(--red)' }}>{error}</div>}

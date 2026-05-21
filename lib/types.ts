@@ -1,5 +1,13 @@
 export type Severity    = 'Critical' | 'High' | 'Medium' | 'Low'
-export type Platform    = 'Microsoft Sentinel (KQL)' | 'Splunk (SPL)' | 'Elastic (EQL)'
+export type Platform    =
+  | 'Microsoft Sentinel (KQL)'
+  | 'Microsoft Defender XDR (KQL)'
+  | 'Splunk (SPL)'
+  | 'Elastic (EQL)'
+  | 'AWS CloudWatch Insights'
+  | 'Google Chronicle (YARA-L)'
+  | 'IBM QRadar (AQL)'
+  | 'Wazuh (XML)'
 export type Provider    = 'gemini' | 'openai' | 'anthropic' | 'groq'
 export type ThreatLevel = 'Critical' | 'High' | 'Medium' | 'Low' | 'Benign'
 export type Theme       = 'cyber' | 'terminal' | 'clean' | 'midnight' | 'rose' | 'ocean'
@@ -50,6 +58,15 @@ export interface DbRule {
   tags: string[]
   created_at: string
   updated_at: string
+}
+
+export interface RuleVersion {
+  id: string
+  rule_id: string
+  rule_data: DbRule
+  version: number
+  improvements: string[]
+  created_at: string
 }
 
 export interface LogAnalysis {

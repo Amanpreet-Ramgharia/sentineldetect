@@ -8,6 +8,7 @@ export type Platform    =
   | 'Google Chronicle (YARA-L)'
   | 'IBM QRadar (AQL)'
   | 'Wazuh (XML)'
+  | 'CrowdStrike Falcon (SPL)'
 export type Provider    = 'gemini' | 'openai' | 'anthropic' | 'groq'
 export type ThreatLevel = 'Critical' | 'High' | 'Medium' | 'Low' | 'Benign'
 export type Theme       = 'cyber' | 'terminal' | 'clean' | 'midnight' | 'rose' | 'ocean'

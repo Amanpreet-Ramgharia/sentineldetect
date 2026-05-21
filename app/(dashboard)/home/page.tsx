@@ -182,6 +182,7 @@ export default function HomePage() {
             { href:'/api-docs',  label:'API access'        },
             { href:'/teams',     label:'Team workspace'    },
             { href:'/templates', label:'My templates'      },
+            { href:'/report',    label:'Export PDF',      target:'_blank' },
           ].map(a=>(
             <Link key={a.href} href={a.href} style={{ padding:'.5rem 1rem', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', textDecoration:'none', fontSize:'.78rem', transition:'all .15s' }}>
               {a.label}

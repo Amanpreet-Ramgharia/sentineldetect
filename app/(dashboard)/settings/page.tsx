@@ -3,10 +3,11 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 const PROVIDERS = [
-  { key:'gemini',    name:'Google Gemini',    placeholder:'AIzaSy...', info:'Free tier — 500 req/day, no credit card', link:'https://aistudio.google.com/app/apikey' },
-  { key:'openai',    name:'OpenAI',           placeholder:'sk-...',    info:'Requires credits. gpt-4o-mini recommended', link:'https://platform.openai.com/api-keys' },
-  { key:'anthropic', name:'Anthropic Claude', placeholder:'sk-ant-...',info:'Requires credits. Haiku recommended', link:'https://console.anthropic.com/settings/keys' },
-  { key:'groq',      name:'Groq',             placeholder:'gsk_...',   info:'Free tier — very fast inference', link:'https://console.groq.com/keys' },
+  { key:'gemini',       name:'Google Gemini',    placeholder:'AIzaSy...', info:'Free tier — 500 req/day, no credit card', link:'https://aistudio.google.com/app/apikey' },
+  { key:'openai',       name:'OpenAI',           placeholder:'sk-...',    info:'Requires credits. gpt-4o-mini recommended', link:'https://platform.openai.com/api-keys' },
+  { key:'anthropic',    name:'Anthropic Claude', placeholder:'sk-ant-...',info:'Requires credits. Haiku recommended', link:'https://console.anthropic.com/settings/keys' },
+  { key:'groq',         name:'Groq',             placeholder:'gsk_...',   info:'Free tier — very fast inference', link:'https://console.groq.com/keys' },
+  { key:'virustotal',   name:'VirusTotal',        placeholder:'...',       info:'Free tier — 500 lookups/day. Enriches IPs and hashes in Log Analyser', link:'https://www.virustotal.com/gui/my-apikey' },
 ]
 
 interface StoredKey { provider: string; masked: string; created_at: string }

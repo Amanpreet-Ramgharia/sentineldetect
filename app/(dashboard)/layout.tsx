@@ -18,6 +18,7 @@ const NAV = [
   { href:'/api-docs',     label:'API Access'      },
   { href:'/teams',        label:'Teams'           },
   { href:'/settings',     label:'Settings'        },
+  { href:'/report',       label:'Export PDF'      },
 ]
 
 const THEMES: { value: Theme; label: string }[] = [

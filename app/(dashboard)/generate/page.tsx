@@ -30,6 +30,7 @@ const PLATFORMS: Platform[] = [
   'Google Chronicle (YARA-L)',
   'IBM QRadar (AQL)',
   'Wazuh (XML)',
+  'CrowdStrike Falcon (SPL)',
 ]
 
 const IMPROVE_OPTIONS = [

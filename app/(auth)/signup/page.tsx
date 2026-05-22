@@ -17,7 +17,7 @@ export default function SignupPage() {
     setLoading(true); setError('')
     const { error } = await createClient().auth.signUp({
       email, password,
-      options: { data: { full_name: name }, emailRedirectTo: `${window.location.origin}/home` },
+      options: { data: { full_name: name }, emailRedirectTo: `${window.location.origin}/auth/confirm` },
     })
     if (error) { setError(error.message); setLoading(false) }
     else setDone(true)

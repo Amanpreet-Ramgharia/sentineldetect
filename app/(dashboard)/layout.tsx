@@ -17,6 +17,7 @@ const NAV = [
   { href:'/integrations', label:'Integrations'    },
   { href:'/api-docs',     label:'API Access'      },
   { href:'/teams',        label:'Teams'           },
+  { href:'/profile',      label:'Profile'         },
   { href:'/settings',     label:'Settings'        },
   { href:'/report',       label:'Export PDF'      },
 ]

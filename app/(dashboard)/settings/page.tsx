@@ -8,6 +8,7 @@ const PROVIDERS = [
   { key:'anthropic',    name:'Anthropic Claude', placeholder:'sk-ant-...',info:'Requires credits. Haiku recommended', link:'https://console.anthropic.com/settings/keys' },
   { key:'groq',         name:'Groq',             placeholder:'gsk_...',   info:'Free tier — very fast inference', link:'https://console.groq.com/keys' },
   { key:'virustotal',   name:'VirusTotal',        placeholder:'...',       info:'Free tier — 500 lookups/day. Enriches IPs and hashes in Log Analyser', link:'https://www.virustotal.com/gui/my-apikey' },
+  { key:'github',       name:'GitHub (Gist export)', placeholder:'ghp_...',  info:'Personal Access Token with gist scope. Lets you export rules directly to GitHub Gist', link:'https://github.com/settings/tokens/new?scopes=gist&description=SentinelDetect' },
 ]
 
 interface StoredKey { provider: string; masked: string; created_at: string }

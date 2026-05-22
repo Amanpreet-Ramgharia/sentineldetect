@@ -112,6 +112,19 @@ export default function LoginPage() {
                 <Link href="/forgot-password" style={{ fontSize:'.78rem', color:'var(--muted)', textDecoration:'none' }}>Forgot password?</Link>
                 <p style={{ fontSize:'.78rem', color:'var(--muted)', margin:0 }}>No account? <Link href="/signup" style={{ color:'#f97316', textDecoration:'none', fontWeight:600 }}>Create one free</Link></p>
               </div>
+              <div style={{ display:'flex', alignItems:'center', gap:'.75rem', margin:'.25rem 0' }}>
+                <div style={{ flex:1, height:1, background:'var(--border)' }}/>
+                <span style={{ fontSize:'.7rem', color:'var(--muted2)' }}>or continue with</span>
+                <div style={{ flex:1, height:1, background:'var(--border)' }}/>
+              </div>
+              <div style={{ display:'flex', gap:'.5rem' }}>
+                {(['google','github'] as const).map(p => (
+                  <button key={p} onClick={() => createClient().auth.signInWithOAuth({ provider: p, options: { redirectTo: `${window.location.origin}/auth/confirm` } })}
+                    style={{ flex:1, padding:'.6rem', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--muted)', fontSize:'.8rem', cursor:'pointer', fontFamily:'inherit', fontWeight:500, textTransform:'capitalize' }}>
+                    {p === 'google' ? 'Google' : 'GitHub'}
+                  </button>
+                ))}
+              </div>
             </form>
           ) : (
             <form onSubmit={verifyMFA} style={{ display:'flex', flexDirection:'column', gap:'1rem' }}>

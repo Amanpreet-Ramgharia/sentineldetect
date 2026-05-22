@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>SentinelDetect</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { width: 360px; min-height: 460px; font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; padding: 1rem; }
+  .logo { display:flex; align-items:center; gap:.5rem; margin-bottom:1rem; padding-bottom:.75rem; border-bottom:1px solid rgba(99,102,241,.2); }
+  .logo-badge { width:28px; height:28px; background:#f97316; border-radius:7px; display:flex; align-items:center; justify-content:center; font-family:monospace; font-weight:700; color:#fff; font-size:.6rem; }
+  .logo-text { font-size:.88rem; font-weight:700; } .logo-text span { color:#f97316; }
+  label { display:block; font-size:.65rem; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color:#64748b; margin-bottom:.3rem; }
+  textarea, input, select { width:100%; background:#1e293b; border:1px solid rgba(99,102,241,.2); border-radius:7px; padding:.55rem .75rem; color:#e2e8f0; font-size:.78rem; font-family:inherit; outline:none; }
+  textarea:focus, input:focus, select:focus { border-color:rgba(249,115,22,.45); }
+  textarea { resize:none; }
+  .field { margin-bottom:.75rem; }
+  .btn { width:100%; padding:.7rem; background:#f97316; border:none; border-radius:8px; color:#fff; font-weight:700; font-size:.88rem; cursor:pointer; font-family:inherit; margin-top:.25rem; }
+  .btn:disabled { background:#475569; cursor:not-allowed; }
+  .btn-sm { width:auto; padding:.3rem .65rem; background:transparent; border:1px solid rgba(99,102,241,.25); border-radius:6px; color:#94a3b8; font-size:.7rem; cursor:pointer; font-family:inherit; }
+  .result { margin-top:.75rem; background:#0b1120; border:1px solid rgba(99,102,241,.2); border-radius:8px; overflow:hidden; }
+  .result-header { padding:.4rem .75rem; background:rgba(99,102,241,.08); border-bottom:1px solid rgba(99,102,241,.15); font-size:.62rem; font-family:monospace; color:#64748b; text-transform:uppercase; letter-spacing:.07em; display:flex; justify-content:space-between; }
+  .result-code { padding:.75rem; font-family:monospace; font-size:.7rem; color:#a5b4fc; white-space:pre-wrap; word-break:break-word; max-height:160px; overflow-y:auto; }
+  .error { background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.25); border-radius:7px; padding:.55rem .75rem; font-size:.75rem; color:#f87171; margin-top:.5rem; }
+  .badge { display:inline-block; font-size:.6rem; padding:.1rem .4rem; border-radius:4px; font-weight:600; margin-right:.3rem; }
+  .spinner { width:14px; height:14px; border:2px solid rgba(255,255,255,.3); border-top-color:#fff; border-radius:50%; animation:spin .65s linear infinite; display:inline-block; margin-right:.4rem; vertical-align:middle; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .setup { text-align:center; padding:1.5rem 0; }
+  .setup a { color:#f97316; font-size:.82rem; }
+</style>
+</head>
+<body>
+<div class="logo">
+  <div class="logo-badge">SD</div>
+  <div class="logo-text">Sentinel<span>Detect</span></div>
+  <button class="btn-sm" id="settingsBtn" style="margin-left:auto;">Settings</button>
+</div>
+
+<div id="mainView">
+  <div class="field">
+    <label>Attack scenario</label>
+    <textarea id="scenario" rows="4" placeholder="Describe the attack to detect in plain English..."></textarea>
+  </div>
+  <div class="field">
+    <label>Platform</label>
+    <select id="platform">
+      <option value="Microsoft Sentinel (KQL)">Microsoft Sentinel (KQL)</option>
+      <option value="Microsoft Defender XDR (KQL)">Microsoft Defender XDR (KQL)</option>
+      <option value="Splunk (SPL)">Splunk (SPL)</option>
+      <option value="Elastic (EQL)">Elastic (EQL)</option>
+      <option value="Wazuh (XML)">Wazuh (XML)</option>
+      <option value="CrowdStrike Falcon (SPL)">CrowdStrike Falcon (SPL)</option>
+      <option value="AWS CloudWatch Insights">AWS CloudWatch Insights</option>
+      <option value="Google Chronicle (YARA-L)">Google Chronicle (YARA-L)</option>
+      <option value="IBM QRadar (AQL)">IBM QRadar (AQL)</option>
+      <option value="Palo Alto Cortex XSIAM (XQL)">Palo Alto Cortex XSIAM (XQL)</option>
+    </select>
+  </div>
+  <button class="btn" id="generateBtn">Generate Detection Rule</button>
+  <div id="error" class="error" style="display:none;"></div>
+  <div id="result" class="result" style="display:none;">
+    <div class="result-header">
+      <span id="resultTitle"></span>
+      <button class="btn-sm" id="copyBtn">Copy</button>
+    </div>
+    <div class="result-code" id="resultCode"></div>
+    <div style="padding:.5rem .75rem; border-top:1px solid rgba(99,102,241,.15); font-size:.65rem; color:#475569; display:flex; gap:.5rem; flex-wrap:wrap;" id="resultMeta"></div>
+  </div>
+</div>
+
+<div id="settingsView" style="display:none;">
+  <div class="field">
+    <label>SentinelDetect API Key</label>
+    <input type="password" id="apiKeyInput" placeholder="sd_xxxxxxxxxxxxxxxx"/>
+    <div style="font-size:.65rem;color:#475569;margin-top:.3rem;">Get your key from <a href="https://smartswingalerts.com/api-docs" target="_blank">API Access page</a></div>
+  </div>
+  <button class="btn" id="saveKey">Save key</button>
+  <button class="btn-sm" id="backBtn" style="margin-top:.5rem;width:100%;text-align:center;">Back</button>
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>

@@ -60,6 +60,10 @@ export default function RulesPage() {
   const [sel,       setSel]       = useState<DbRule | null>(null)
   const [tab,       setTab]       = useState('desc')
   const [deleting,  setDeleting]  = useState<string|null>(null)
+  const [sharing,  setSharing]  = useState(false)
+  const [shareUrl, setShareUrl] = useState<string|null>(null)
+  const [scoring,  setScoring]  = useState(false)
+  const [quality,  setQuality]  = useState<Record<string,any>|null>(null)
   const [copied,      setCopied]      = useState(false)
   const [playbook,    setPlaybook]    = useState<Record<string,any>|null>(null)
   const [playLoading, setPlayLoading] = useState(false)
@@ -94,6 +98,30 @@ export default function RulesPage() {
     const { data } = await sb.from('rules').select('*').order('created_at', { ascending: false })
     setRules((data as DbRule[]) || [])
     setLoading(false)
+  }
+
+  async function shareRule(rule: DbRule) {
+    setSharing(true); setShareUrl(null)
+    const newPublic = !rule.is_public
+    const res = await fetch('/api/share', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ rule_id: rule.id, is_public: newPublic }) })
+    const data = await res.json()
+    if (!res.ok) { alert(data.error); setSharing(false); return }
+    if (newPublic) {
+      const url = `${window.location.origin}/share/${rule.id}`
+      setShareUrl(url)
+      navigator.clipboard.writeText(url)
+    }
+    setSharing(false)
+    load()
+  }
+
+  async function scoreRule(rule: DbRule) {
+    setScoring(true); setQuality(null)
+    const res = await fetch('/api/quality', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ rule, provider:'gemini' }) })
+    const data = await res.json()
+    if (!res.ok) { alert(data.error); setScoring(false); return }
+    setQuality(data.quality)
+    setScoring(false)
   }
 
   async function del(id: string) {
@@ -342,6 +370,50 @@ export default function RulesPage() {
                         </div>
                       ))}
                     </div>
+                  )}
+                </div>
+              )}
+
+              {/* Share URL banner */}
+              {shareUrl && (
+                <div style={{margin:'0 1rem .5rem', padding:'.65rem .9rem', background:'var(--green-bg)', border:'1px solid var(--green-bd)', borderRadius:8, display:'flex', alignItems:'center', gap:'.75rem', flexWrap:'wrap'}}>
+                  <span style={{fontSize:'.75rem', color:'var(--green)', fontWeight:600}}>Rule shared — link copied to clipboard</span>
+                  <code style={{fontSize:'.7rem', fontFamily:'monospace', color:'var(--green)', flex:1, wordBreak:'break-all'}}>{shareUrl}</code>
+                  <button onClick={()=>setShareUrl(null)} style={{background:'none', border:'none', cursor:'pointer', color:'var(--muted)', fontSize:'.75rem', fontFamily:'inherit'}}>Dismiss</button>
+                </div>
+              )}
+
+              {/* Quality score */}
+              {quality && (
+                <div style={{margin:'0 1rem .5rem', padding:'.85rem 1rem', background:'var(--bg4)', border:'1px solid var(--border)', borderRadius:10}}>
+                  <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'.65rem', flexWrap:'wrap', gap:'.5rem'}}>
+                    <div style={{fontSize:'.78rem', fontWeight:600, color:'var(--text)'}}>Rule Quality Score</div>
+                    <div style={{display:'flex', alignItems:'center', gap:.5+'rem'}}>
+                      <div style={{fontSize:'1.4rem', fontWeight:800, color: (quality.overall as number)>=7?'var(--green)':(quality.overall as number)>=5?'#f97316':'var(--red)'}}>{quality.overall as number}/10</div>
+                      <button onClick={()=>setQuality(null)} style={{background:'none', border:'none', cursor:'pointer', color:'var(--muted)', fontSize:'.75rem', fontFamily:'inherit'}}>Close</button>
+                    </div>
+                  </div>
+                  <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))', gap:'.4rem', marginBottom:'.6rem'}}>
+                    {[
+                      {label:'Specificity',     val: quality.specificity as number},
+                      {label:'FP risk',         val: quality.fp_risk as number, invert:true},
+                      {label:'Coverage',        val: quality.coverage as number},
+                      {label:'Implementation',  val: quality.implementation as number},
+                    ].map(m => (
+                      <div key={m.label} style={{background:'var(--bg)', border:'1px solid var(--border)', borderRadius:6, padding:'.45rem .65rem'}}>
+                        <div style={{fontSize:'.62rem', color:'var(--muted)', marginBottom:'.15rem'}}>{m.label}</div>
+                        <div style={{display:'flex', alignItems:'center', gap:'.4rem'}}>
+                          <div style={{flex:1, background:'var(--bg3)', borderRadius:999, height:4, overflow:'hidden'}}>
+                            <div style={{width:`${(m.invert ? 11-m.val : m.val)*10}%`, height:'100%', background:'#f97316', borderRadius:999}}/>
+                          </div>
+                          <span style={{fontSize:'.72rem', fontWeight:600, color:'var(--text)', fontFamily:'monospace'}}>{m.val}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{fontSize:'.75rem', color:'var(--muted)', lineHeight:1.55, marginBottom:'.4rem'}}>{quality.summary as string}</div>
+                  {(quality.improvements as string[])?.length > 0 && (
+                    <div style={{fontSize:'.72rem', color:'var(--muted2)'}}>Improvements: {(quality.improvements as string[]).join(' · ')}</div>
                   )}
                 </div>
               )}

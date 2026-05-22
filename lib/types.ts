@@ -9,6 +9,7 @@ export type Platform    =
   | 'IBM QRadar (AQL)'
   | 'Wazuh (XML)'
   | 'CrowdStrike Falcon (SPL)'
+  | 'Palo Alto Cortex XSIAM (XQL)'
 export type Provider    = 'gemini' | 'openai' | 'anthropic' | 'groq'
 export type ThreatLevel = 'Critical' | 'High' | 'Medium' | 'Low' | 'Benign'
 export type Theme       = 'cyber' | 'terminal' | 'clean' | 'midnight' | 'rose' | 'ocean'
@@ -56,6 +57,7 @@ export interface DbRule {
   scenario: string | null
   note: string | null
   is_favourite: boolean
+  is_public: boolean
   tags: string[]
   created_at: string
   updated_at: string

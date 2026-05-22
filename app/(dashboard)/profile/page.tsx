@@ -228,7 +228,7 @@ export default function ProfilePage() {
 
   // ── OAuth ────────────────────────────────────────────────
   async function signInWithProvider(provider: 'google' | 'github') {
-    const { error } = await createClient().auth.signInWithOAuth({
+    const { error } = await createClient().auth.linkIdentity({
       provider,
       options: { redirectTo: `${window.location.origin}/auth/confirm` },
     })

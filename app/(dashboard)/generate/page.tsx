@@ -31,6 +31,7 @@ const PLATFORMS: Platform[] = [
   'IBM QRadar (AQL)',
   'Wazuh (XML)',
   'CrowdStrike Falcon (SPL)',
+  'Palo Alto Cortex XSIAM (XQL)',
 ]
 
 const IMPROVE_OPTIONS = [

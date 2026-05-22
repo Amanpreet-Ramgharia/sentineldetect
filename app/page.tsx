@@ -132,6 +132,7 @@ export default async function LandingPage() {
           </div>
           <div style={{ display:'flex', gap:'1.25rem' }}>
             <a href="https://github.com/Amanpreet-Ramgharia/sentineldetect" target="_blank" rel="noopener" style={{ fontSize:'.78rem', color:'#475569', textDecoration:'none' }}>GitHub</a>
+            <a href="/community" style={{ fontSize:'.78rem', color:'#475569', textDecoration:'none' }}>Community Rules</a>
             <a href="https://www.linkedin.com/in/amanpreets94/" target="_blank" rel="noopener" style={{ fontSize:'.78rem', color:'#475569', textDecoration:'none' }}>LinkedIn</a>
           </div>
         </div>

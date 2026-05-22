@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Outfit, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
+import { Analytics } from '@vercel/analytics/react'
 
 const outfit = Outfit({ subsets: ['latin'], variable: '--font-outfit', display: 'swap' })
 const mono   = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono-var', display: 'swap' })
@@ -17,7 +18,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" data-theme="cyber" suppressHydrationWarning>
       <head><link rel="manifest" href="/manifest.json"/></head>
-      <body className={`${outfit.variable} ${mono.variable}`}>{children}</body>
+      <body className={`${outfit.variable} ${mono.variable}`}>{children}
+      <Analytics />
+      </body>
     </html>
   )
 }

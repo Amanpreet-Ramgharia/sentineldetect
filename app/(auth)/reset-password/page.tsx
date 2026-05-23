@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/supabase/client'
+import { createClient } from '@/lib/supabase/client'
 
 type Stage = 'checking' | 'ready' | 'expired' | 'success'
 

@@ -646,7 +646,83 @@ export default function ProfilePage() {
                       <span style={{ fontSize:'.78rem', color:'var(--muted)', flex:1 }}>{sev}</span>
                       <span style={{ fontSize:'.78rem', fontWeight:600, color:'var(--text)', fontFamily:'monospace' }}>{n}</span>
                     </div>
-                  )
+                  )// =============================================================================
+// profile/page.tsx — PATCH GUIDE
+// These are the two specific sections to update.
+// Search for the relevant comment anchors and replace.
+// =============================================================================
+
+
+// ── 1. ACCOUNT DELETION ──────────────────────────────────────────────────────
+//
+// FIND your existing delete handler — it probably looks something like:
+//
+//   await supabase.from('profiles').delete().eq('id', user.id)
+//   await supabase.auth.signOut()
+//   router.push('/login')
+//
+// REPLACE with:
+
+const handleDeleteAccount = async () => {
+  if (!confirm('Are you sure? This will permanently delete your account and all data. This cannot be undone.')) {
+    return
+  }
+
+  setDeleting(true) // add this state: const [deleting, setDeleting] = useState(false)
+
+  const res = await fetch('/api/delete-account', { method: 'DELETE' })
+  const data = await res.json()
+
+  if (!res.ok) {
+    alert(data.error ?? 'Failed to delete account. Please try again.')
+    setDeleting(false)
+    return
+  }
+
+  // Auth record is gone — just redirect
+  router.push('/login')
+}
+
+
+// ── 2. PASSWORD CHANGE (Security tab) ────────────────────────────────────────
+//
+// FIND your existing password change — likely:
+//
+//   const { error } = await supabase.auth.updateUser({ password: newPassword })
+//
+// REPLACE with:
+
+const handleChangePassword = async (e: React.FormEvent) => {
+  e.preventDefault()
+  setPasswordError('')
+
+  if (newPassword !== confirmPassword) {
+    setPasswordError('Passwords do not match.')
+    return
+  }
+
+  setChangingPassword(true)
+
+  const res = await fetch('/api/change-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: newPassword }),
+  })
+
+  const data = await res.json()
+
+  if (!res.ok) {
+    // This will surface the "cannot reuse last 5 passwords" message
+    setPasswordError(data.error ?? 'Failed to update password.')
+    setChangingPassword(false)
+    return
+  }
+
+  setPasswordSuccess('Password updated successfully.')
+  setNewPassword('')
+  setConfirmPassword('')
+  setChangingPassword(false)
+}
                 })}
               </div>
             </div>

@@ -2,43 +2,77 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request })
+  // CRITICAL: Must create response first, then mutate cookies on it
+  let supabaseResponse = NextResponse.next({ request })
 
+  // CRITICAL: Create Supabase client BEFORE any early returns.
+  // This is what exchanges the ?code= token from password-reset / email-confirm emails.
+  // If you early-return before this, reset links will always appear "expired".
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() { return request.cookies.getAll() },
+        getAll() {
+          return request.cookies.getAll()
+        },
         setAll(cookiesToSet: { name: string; value: string; options?: any }[]) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          response = NextResponse.next({ request })
+          supabaseResponse = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, options)
           )
         },
       },
     }
   )
 
-  // Refresh session on every request — keeps users logged in
-  const { data: { user } } = await supabase.auth.getUser()
+  // CRITICAL: Always call getUser() — this triggers code exchange for ?code= params.
+  // Do NOT remove this or add any early returns before it.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  // Redirect unauthenticated users away from dashboard routes
-  const isDashboard = !request.nextUrl.pathname.startsWith('/login') &&
-    !request.nextUrl.pathname.startsWith('/signup') &&
-    !request.nextUrl.pathname.startsWith('/forgot-password') &&
-    !request.nextUrl.pathname.startsWith('/reset-password') &&
-    request.nextUrl.pathname !== '/' &&
-    !request.nextUrl.pathname.startsWith('/api/')
+  const { pathname } = request.nextUrl
 
-  if (isDashboard && !user) {
-    return NextResponse.redirect(new URL('/login', request.url))
+  // Routes that do NOT require authentication
+  const publicRoutes = [
+    '/login',
+    '/signup',
+    '/forgot-password',
+    '/reset-password',
+    '/auth',       // covers /auth/confirm and all /auth/* callbacks
+    '/share',      // covers /share/[ruleId]
+    '/community',
+  ]
+
+  const isPublicRoute = publicRoutes.some(
+    (route) =>
+      pathname === route ||
+      pathname.startsWith(route + '/') ||
+      pathname.startsWith(route + '?')
+  )
+
+  // Redirect unauthenticated users trying to access protected routes
+  if (!user && !isPublicRoute) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    return NextResponse.redirect(url)
   }
 
-  return response
+  // Optional: redirect already-logged-in users away from login/signup
+  if (user && (pathname.startsWith('/login') || pathname.startsWith('/signup'))) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/home'
+    return NextResponse.redirect(url)
+  }
+
+  // CRITICAL: return supabaseResponse (not NextResponse.next()) so cookies are set
+  return supabaseResponse
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
 }

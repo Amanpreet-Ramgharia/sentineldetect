@@ -1,20 +1,23 @@
-import { createServiceClient } from '@/lib/supabase/server'
+'use client'
+import { useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
-export const revalidate = 300 // cache 5 minutes
+export default function CommunityPage() {
+  const [allRules, setAllRules] = useState<any[]>([])
+  const [loading, setLoading]   = useState(true)
 
-export default async function CommunityPage() {
-  const sb = createServiceClient()
-  const { data: rules } = await sb
-    .from('rules')
-    .select('id,title,platform,severity,tactic,mitre_id,mitre_name,description,confidence,created_at')
-    .eq('is_public', true)
-    .order('created_at', { ascending: false })
-    .limit(100)
-
-  const allRules = rules || []
-  const platforms = [...new Set(allRules.map(r => r.platform?.split(' ')[0]).filter(Boolean))]
-  const tactics   = [...new Set(allRules.map(r => r.tactic).filter(Boolean))].sort()
+  useEffect(() => {
+    const sb = createClient()
+    sb.from('rules')
+      .select('id,title,platform,severity,tactic,mitre_id,mitre_name,description,confidence,created_at')
+      .eq('is_public', true)
+      .order('created_at', { ascending: false })
+      .limit(100)
+      .then(({ data }) => { setAllRules(data || []); setLoading(false) })
+  }, [])
+  const platforms = [...new Set(allRules.map((r:any) => r.platform?.split(' ')[0]).filter(Boolean))]
+  const tactics   = [...new Set(allRules.map((r:any) => r.tactic).filter(Boolean))].sort()
   const SEV: Record<string,string> = { Critical:'#dc2626', High:'#ef4444', Medium:'#f97316', Low:'#3b82f6' }
 
   return (

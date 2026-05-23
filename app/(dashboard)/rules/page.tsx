@@ -288,14 +288,18 @@ export default function RulesPage() {
                     {sel.confidence!=null && <span style={{fontSize:'.62rem', padding:'.15rem .5rem', borderRadius:4, fontWeight:600, background:'var(--green-bg)', color:'var(--green)', border:'1px solid var(--green-bd)'}}>{sel.confidence}% confidence</span>}
                   </div>
                 </div>
-                <div style={{display:'flex', gap:'.4rem', flexShrink:0, flexWrap:'wrap'}}>
-                  <button onClick={()=>{navigator.clipboard.writeText(sel.rule);setCopied(true);setTimeout(()=>setCopied(false),2000)}} style={btn}>{copied?' Copied':'Copy'}</button>
-                  <button onClick={()=>dlKQL(sel)} style={btn}>Download .kql</button>
-                  <button onClick={()=>dlARM(sel)} style={btn}>Download ARM</button>
-                  <button onClick={()=>dlSigma(sel)} style={btn}>Download Sigma</button>
-                  <button onClick={()=>{setShowTest(!showTest);setShowPlay(false)}} style={btn}>Test Rule</button>
-                  <button onClick={()=>{generatePlaybook(sel);setShowTest(false)}} style={btn}>IR Playbook</button>
+                <div style={{display:'flex', gap:'.3rem', flexWrap:'wrap', marginTop:'.5rem'}}>
+                  <button onClick={()=>{navigator.clipboard.writeText(sel.rule);setCopied(true);setTimeout(()=>setCopied(false),2000)}} style={btn}>{copied?'Copied':'Copy'}</button>
+                  <button onClick={()=>dlKQL(sel)} style={btn}>.kql</button>
+                  <button onClick={()=>dlARM(sel)} style={btn}>ARM</button>
+                  <button onClick={()=>dlSigma(sel)} style={btn}>Sigma</button>
+                  <button onClick={()=>{setShowTest(!showTest);setShowPlay(false)}} style={btn}>Test</button>
+                  <button onClick={()=>{generatePlaybook(sel);setShowTest(false)}} style={btn}>Playbook</button>
                   <button onClick={()=>validateRule(sel)} style={btn}>Validate</button>
+                  <button onClick={()=>scoreRule(sel)} disabled={scoring} style={btn}>{scoring?'Scoring...':'Score'}</button>
+                  <button onClick={()=>shareRule(sel)} disabled={sharing} style={{...btn, color:sel.is_public?'var(--green)':'var(--muted)', borderColor:sel.is_public?'var(--green-bd)':'var(--border)'}}>
+                    {sharing?'...':(sel.is_public?'Unshare':'Share')}
+                  </button>
                   <button onClick={()=>del(sel.id)} disabled={deleting===sel.id} style={{...btn, borderColor:'var(--red-bd)', background:'var(--red-bg)', color:'var(--red)'}}>{deleting===sel.id?'...':'Delete'}</button>
                 </div>
               </div>

@@ -46,6 +46,7 @@ export async function middleware(request: NextRequest) {
     '/auth',
     '/share',
     '/community',
+    '/api',
   ]
 
   const isPublicRoute =

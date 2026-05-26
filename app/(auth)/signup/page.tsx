@@ -1,27 +1,99 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
+declare global {
+  interface Window {
+    turnstile: {
+      render: (el: HTMLElement, opts: {
+        sitekey: string
+        callback: (token: string) => void
+        'expired-callback': () => void
+        'error-callback': () => void
+        theme: string
+        size: string
+      }) => string
+      reset: (id: string) => void
+    }
+  }
+}
+
+const TURNSTILE_SITE_KEY = '0x4AAAAAADWqjSibMwElOEvG'
+
 export default function SignupPage() {
-  const [name, setName]         = useState('')
-  const [email, setEmail]       = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading]   = useState(false)
+  const [name, setName]               = useState('')
+  const [email, setEmail]             = useState('')
+  const [password, setPassword]       = useState('')
+  const [loading, setLoading]         = useState(false)
   const [oauthLoading, setOauthLoading] = useState<'google'|'github'|null>(null)
-  const [error, setError]       = useState('')
-  const [done, setDone]         = useState(false)
+  const [error, setError]             = useState('')
+  const [done, setDone]               = useState(false)
+  const [captchaToken, setCaptchaToken] = useState('')
+  const [captchaReady, setCaptchaReady] = useState(false)
+
+  const turnstileRef = useRef<HTMLDivElement>(null)
+  const widgetId     = useRef<string>('')
+
+  // Load Turnstile script and render widget
+  useEffect(() => {
+    const SCRIPT_ID = 'cf-turnstile-script'
+    if (document.getElementById(SCRIPT_ID)) {
+      renderWidget()
+      return
+    }
+    const script = document.createElement('script')
+    script.id    = SCRIPT_ID
+    script.src   = 'https://challenges.cloudflare.com/turnstile/v0/api.js'
+    script.async = true
+    script.defer = true
+    script.onload = renderWidget
+    document.head.appendChild(script)
+  }, [])
+
+  function renderWidget() {
+    if (!turnstileRef.current || !window.turnstile) return
+    widgetId.current = window.turnstile.render(turnstileRef.current, {
+      sitekey:           TURNSTILE_SITE_KEY,
+      callback:          (token) => { setCaptchaToken(token); setCaptchaReady(true) },
+      'expired-callback': ()    => { setCaptchaToken('');    setCaptchaReady(false) },
+      'error-callback':   ()    => { setCaptchaToken('');    setCaptchaReady(false) },
+      theme: 'auto',
+      size:  'normal',
+    })
+  }
+
+  function resetCaptcha() {
+    setCaptchaToken('')
+    setCaptchaReady(false)
+    if (widgetId.current && window.turnstile) {
+      window.turnstile.reset(widgetId.current)
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (password.length < 6) { setError('Password must be at least 6 characters'); return }
+    if (!captchaToken)        { setError('Please complete the verification above'); return }
     setLoading(true); setError('')
+
     const { error } = await createClient().auth.signUp({
-      email, password,
-      options: { data: { full_name: name }, emailRedirectTo: `${window.location.origin}/auth/confirm` },
+      email,
+      password,
+      options: {
+        data:             { full_name: name },
+        emailRedirectTo:  `${window.location.origin}/auth/confirm`,
+        captchaToken,
+      },
     })
-    if (error) { setError(error.message); setLoading(false) }
-    else setDone(true)
+
+    if (error) {
+      setError(error.message)
+      setLoading(false)
+      resetCaptcha()
+    } else {
+      setDone(true)
+    }
   }
 
   async function signInWithProvider(provider: 'google' | 'github') {
@@ -39,11 +111,14 @@ export default function SignupPage() {
   return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--bg)', padding:'1rem' }}>
       <div style={{ width:'100%', maxWidth:400 }}>
+
+        {/* Logo */}
         <div style={{ textAlign:'center', marginBottom:'2rem' }}>
           <div style={{ width:44, height:44, background:'#f97316', borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'monospace', fontWeight:700, color:'#fff', fontSize:'.9rem', margin:'0 auto .75rem', boxShadow:'0 4px 16px rgba(249,115,22,.35)' }}>SD</div>
           <h1 style={{ fontSize:'1.35rem', fontWeight:700, color:'var(--text)', margin:0 }}>Sentinel<span style={{ color:'#f97316' }}>Detect</span></h1>
           <p style={{ fontSize:'.82rem', color:'var(--muted)', marginTop:'.3rem' }}>Create your free account</p>
         </div>
+
         <div style={{ background:'var(--bg4)', border:'1px solid var(--border)', borderRadius:14, padding:'1.75rem', boxShadow:'0 4px 24px rgba(0,0,0,.15)' }}>
           {done ? (
             <div style={{ textAlign:'center', padding:'1rem 0' }}>
@@ -55,7 +130,7 @@ export default function SignupPage() {
           ) : (
             <div style={{ display:'flex', flexDirection:'column', gap:'1rem' }}>
 
-              {/* ── OAuth buttons ── */}
+              {/* OAuth buttons */}
               <div style={{ display:'flex', flexDirection:'column', gap:'.6rem' }}>
                 <button type="button" onClick={() => signInWithProvider('google')} disabled={!!oauthLoading} style={oauthBtn}>
                   <svg width="17" height="17" viewBox="0 0 48 48">
@@ -74,14 +149,14 @@ export default function SignupPage() {
                 </button>
               </div>
 
-              {/* ── Divider ── */}
+              {/* Divider */}
               <div style={{ display:'flex', alignItems:'center', gap:'.75rem' }}>
                 <div style={{ flex:1, height:1, background:'var(--border)' }}/>
                 <span style={{ fontSize:'.72rem', color:'var(--muted2)', whiteSpace:'nowrap' }}>or sign up with email</span>
                 <div style={{ flex:1, height:1, background:'var(--border)' }}/>
               </div>
 
-              {/* ── Email/password form ── */}
+              {/* Email/password form */}
               <form onSubmit={submit} style={{ display:'flex', flexDirection:'column', gap:'1rem' }}>
                 {[['Full name','text',name,setName,'Your name'],['Email','email',email,setEmail,'you@company.com'],['Password','password',password,setPassword,'Min 6 characters']].map(([label, type, val, setter, ph]: any) => (
                   <div key={label} style={{ display:'flex', flexDirection:'column', gap:'.35rem' }}>
@@ -105,12 +180,34 @@ export default function SignupPage() {
                     })()}
                   </div>
                 ))}
-                {error && <div style={{ background:'var(--red-bg)', border:'1px solid var(--red-bd)', borderRadius:7, padding:'.55rem .8rem', fontSize:'.78rem', color:'var(--red)' }}>{error}</div>}
-                <button type="submit" disabled={loading || !!oauthLoading} style={{ background:loading?'var(--muted2)':'#f97316', border:'none', borderRadius:9, padding:'.8rem', color:'#fff', fontWeight:700, fontSize:'.9rem', cursor:loading?'not-allowed':'pointer', fontFamily:'inherit', marginTop:'.25rem' }}>
-                  {loading ? 'Creating account...' : 'Create account'}
+
+                {/* Turnstile CAPTCHA widget */}
+                <div style={{ display:'flex', flexDirection:'column', gap:'.4rem' }}>
+                  <div ref={turnstileRef} />
+                  {!captchaReady && (
+                    <p style={{ fontSize:'.72rem', color:'var(--muted)', margin:0 }}>
+                      Loading verification…
+                    </p>
+                  )}
+                </div>
+
+                {error && (
+                  <div style={{ background:'var(--red-bg)', border:'1px solid var(--red-bd)', borderRadius:7, padding:'.55rem .8rem', fontSize:'.78rem', color:'var(--red)' }}>
+                    {error}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading || !!oauthLoading || !captchaReady}
+                  style={{ background: (loading || !captchaReady) ? 'var(--muted2)' : '#f97316', border:'none', borderRadius:9, padding:'.8rem', color:'#fff', fontWeight:700, fontSize:'.9rem', cursor: (loading || !captchaReady) ? 'not-allowed' : 'pointer', fontFamily:'inherit', marginTop:'.25rem' }}
+                >
+                  {loading ? 'Creating account...' : !captchaReady ? 'Complete verification first' : 'Create account'}
                 </button>
+
                 <p style={{ textAlign:'center', fontSize:'.78rem', color:'var(--muted)', margin:0 }}>
-                  Already have an account? <Link href="/login" style={{ color:'#f97316', textDecoration:'none', fontWeight:600 }}>Sign in</Link>
+                  Already have an account?{' '}
+                  <Link href="/login" style={{ color:'#f97316', textDecoration:'none', fontWeight:600 }}>Sign in</Link>
                 </p>
               </form>
 

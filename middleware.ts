@@ -8,6 +8,14 @@ export async function middleware(request: NextRequest) {
   // CRITICAL: Create Supabase client BEFORE any early returns.
   // This is what exchanges the ?code= token from password-reset / email-confirm emails.
   // If you early-return before this, reset links will always appear "expired".
+  // Add inside middleware(), as the FIRST thing after the function opens:
+const host = request.headers.get('host') ?? ''
+if (host.includes('vercel.app')) {
+  const url = request.nextUrl.clone()
+  url.host     = 'smartswingalerts.com'
+  url.protocol = 'https'
+  return NextResponse.redirect(url, 301)
+}
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

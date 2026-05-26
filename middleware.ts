@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export default async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   // Redirect vercel.app preview URLs to the real domain
   const host = request.headers.get('host') ?? ''
   if (host.includes('vercel.app')) {
@@ -11,8 +11,8 @@ export default async function proxy(request: NextRequest) {
     return NextResponse.redirect(url, 301)
   }
 
-  // CRITICAL: Must create Supabase client BEFORE any early returns so that
-  // ?code= tokens (OAuth, email confirm) are exchanged via cookie.
+  // CRITICAL: Create Supabase client BEFORE any early returns.
+  // This exchanges ?code= tokens (OAuth, email confirm) into session cookies.
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -25,7 +25,7 @@ export default async function proxy(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, options as any)
           )
         },
       },
@@ -37,9 +37,8 @@ export default async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  // Routes accessible without authentication
-  const publicRoutes = [
-    '/',
+  // Public routes — no authentication required
+  const publicPrefixes = [
     '/login',
     '/signup',
     '/forgot-password',
@@ -51,20 +50,20 @@ export default async function proxy(request: NextRequest) {
 
   const isPublicRoute =
     pathname === '/' ||
-    publicRoutes.some(route =>
-      pathname === route ||
-      pathname.startsWith(route + '/') ||
-      pathname.startsWith(route + '?')
+    publicPrefixes.some(p =>
+      pathname === p ||
+      pathname.startsWith(p + '/') ||
+      pathname.startsWith(p + '?')
     )
 
-  // Redirect unauthenticated users away from protected routes
+  // Send unauthenticated users to login (except on public routes)
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  // Redirect authenticated users away from login/signup
+  // Send logged-in users away from login/signup to the app
   if (user && (pathname === '/login' || pathname === '/signup')) {
     const url = request.nextUrl.clone()
     url.pathname = '/home'

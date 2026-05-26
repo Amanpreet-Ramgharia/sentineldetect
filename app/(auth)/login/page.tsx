@@ -1,8 +1,19 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+
+const TURNSTILE_SITE_KEY = '0x4AAAAAADWqjSibMwElOEvG'
+
+declare global {
+  interface Window {
+    turnstile: {
+      render: (el: HTMLElement, opts: { sitekey: string; callback: (t: string) => void; 'expired-callback': () => void; 'error-callback': () => void; theme: string; size: string }) => string
+      reset: (id: string) => void
+    }
+  }
+}
 
 function getDeviceId(): string {
   let id = localStorage.getItem('sd_device_id')
@@ -33,35 +44,65 @@ function trustDevice(userId: string) {
 
 export default function LoginPage() {
   const router = useRouter()
-  const [email,       setEmail]       = useState('')
-  const [password,    setPassword]    = useState('')
-  const [loading,     setLoading]     = useState(false)
-  const [error,       setError]       = useState('')
-  const [mfaRequired, setMfaRequired] = useState(false)
-  const [mfaCode,     setMfaCode]     = useState('')
-  const [mfaLoading,  setMfaLoading]  = useState(false)
-  const [factorId,    setFactorId]    = useState('')
-  const [userId,      setUserId]      = useState('')
-  const [shouldTrust, setShouldTrust] = useState(false)
+  const [email,        setEmail]        = useState('')
+  const [password,     setPassword]     = useState('')
+  const [loading,      setLoading]      = useState(false)
+  const [error,        setError]        = useState('')
+  const [mfaRequired,  setMfaRequired]  = useState(false)
+  const [mfaCode,      setMfaCode]      = useState('')
+  const [mfaLoading,   setMfaLoading]   = useState(false)
+  const [factorId,     setFactorId]     = useState('')
+  const [userId,       setUserId]       = useState('')
+  const [shouldTrust,  setShouldTrust]  = useState(false)
+  const [captchaToken, setCaptchaToken] = useState('')
+  const [captchaReady, setCaptchaReady] = useState(false)
+
+  const turnstileRef = useRef<HTMLDivElement>(null)
+  const widgetId     = useRef<string>('')
+
+  useEffect(() => {
+    const SCRIPT_ID = 'cf-turnstile-script'
+    if (document.getElementById(SCRIPT_ID)) { renderWidget(); return }
+    const script    = document.createElement('script')
+    script.id       = SCRIPT_ID
+    script.src      = 'https://challenges.cloudflare.com/turnstile/v0/api.js'
+    script.async    = true
+    script.defer    = true
+    script.onload   = renderWidget
+    document.head.appendChild(script)
+  }, [])
+
+  function renderWidget() {
+    if (!turnstileRef.current || !window.turnstile) return
+    widgetId.current = window.turnstile.render(turnstileRef.current, {
+      sitekey:            TURNSTILE_SITE_KEY,
+      callback:           (t) => { setCaptchaToken(t); setCaptchaReady(true) },
+      'expired-callback': ()  => { setCaptchaToken(''); setCaptchaReady(false) },
+      'error-callback':   ()  => { setCaptchaToken(''); setCaptchaReady(false) },
+      theme: 'auto',
+      size:  'normal',
+    })
+  }
+
+  function resetCaptcha() {
+    setCaptchaToken(''); setCaptchaReady(false)
+    if (widgetId.current && window.turnstile) window.turnstile.reset(widgetId.current)
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
+    if (!captchaToken) { setError('Please complete the verification below'); return }
     setLoading(true); setError('')
     const sb = createClient()
-    const { data, error } = await sb.auth.signInWithPassword({ email, password })
-    if (error) { setError(error.message); setLoading(false); return }
+    const { data, error } = await sb.auth.signInWithPassword({ email, password, options: { captchaToken } })
+    if (error) { setError(error.message); setLoading(false); resetCaptcha(); return }
 
     const uid = data.user?.id || ''
     setUserId(uid)
 
-    // Check MFA
     const { data: aal } = await sb.auth.mfa.getAuthenticatorAssuranceLevel()
     if (aal?.nextLevel === 'aal2' && aal.nextLevel !== aal.currentLevel) {
-      // Check if this device is trusted
-      if (isTrusted(uid)) {
-        // Skip MFA — device is trusted
-        router.push('/home'); router.refresh(); return
-      }
+      if (isTrusted(uid)) { router.push('/home'); router.refresh(); return }
       const { data: factors } = await sb.auth.mfa.listFactors()
       const totp = factors?.totp?.[0]
       if (totp) { setFactorId(totp.id); setMfaRequired(true); setLoading(false); return }
@@ -73,8 +114,7 @@ export default function LoginPage() {
     e.preventDefault()
     if (mfaCode.length !== 6) return
     setMfaLoading(true); setError('')
-    const sb = createClient()
-    const { error } = await sb.auth.mfa.challengeAndVerify({ factorId, code: mfaCode })
+    const { error } = await createClient().auth.mfa.challengeAndVerify({ factorId, code: mfaCode })
     if (error) { setError('Invalid code — try again'); setMfaLoading(false); return }
     if (shouldTrust) trustDevice(userId)
     router.push('/home'); router.refresh()
@@ -104,10 +144,20 @@ export default function LoginPage() {
                 <label style={{ fontSize:'.72rem', fontWeight:600, color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.08em' }}>Password</label>
                 <input type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="••••••••" autoComplete="current-password" style={inp} onFocus={fo} onBlur={bl}/>
               </div>
+
+              {/* Turnstile widget */}
+              <div>
+                <div ref={turnstileRef} />
+                {!captchaReady && <p style={{ fontSize:'.72rem', color:'var(--muted)', margin:'.3rem 0 0' }}>Loading verification…</p>}
+              </div>
+
               {error && <div style={{ background:'var(--red-bg)', border:'1px solid var(--red-bd)', borderRadius:7, padding:'.55rem .8rem', fontSize:'.78rem', color:'var(--red)' }}>{error}</div>}
-              <button type="submit" disabled={loading} style={{ background:loading?'var(--muted2)':'#f97316', border:'none', borderRadius:9, padding:'.8rem', color:'#fff', fontWeight:700, fontSize:'.9rem', cursor:loading?'not-allowed':'pointer', fontFamily:'inherit' }}>
-                {loading ? 'Signing in...' : 'Sign in'}
+
+              <button type="submit" disabled={loading || !captchaReady}
+                style={{ background: (loading || !captchaReady) ? 'var(--muted2)' : '#f97316', border:'none', borderRadius:9, padding:'.8rem', color:'#fff', fontWeight:700, fontSize:'.9rem', cursor: (loading || !captchaReady) ? 'not-allowed' : 'pointer', fontFamily:'inherit' }}>
+                {loading ? 'Signing in...' : !captchaReady ? 'Loading verification...' : 'Sign in'}
               </button>
+
               <div style={{ display:'flex', flexDirection:'column', gap:'.3rem', textAlign:'center' }}>
                 <Link href="/forgot-password" style={{ fontSize:'.78rem', color:'var(--muted)', textDecoration:'none' }}>Forgot password?</Link>
                 <p style={{ fontSize:'.78rem', color:'var(--muted)', margin:0 }}>No account? <Link href="/signup" style={{ color:'#f97316', textDecoration:'none', fontWeight:600 }}>Create one free</Link></p>
@@ -119,7 +169,7 @@ export default function LoginPage() {
               </div>
               <div style={{ display:'flex', gap:'.5rem' }}>
                 {(['google','github'] as const).map(p => (
-                  <button key={p} onClick={() => createClient().auth.signInWithOAuth({ provider: p, options: { redirectTo: `${window.location.origin}/auth/confirm` } })}
+                  <button key={p} type="button" onClick={() => createClient().auth.signInWithOAuth({ provider: p, options: { redirectTo: `${window.location.origin}/auth/confirm` } })}
                     style={{ flex:1, padding:'.6rem', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--muted)', fontSize:'.8rem', cursor:'pointer', fontFamily:'inherit', fontWeight:500, textTransform:'capitalize' }}>
                     {p === 'google' ? 'Google' : 'GitHub'}
                   </button>
@@ -137,8 +187,7 @@ export default function LoginPage() {
                 onFocus={fo} onBlur={bl}/>
               {error && <div style={{ background:'var(--red-bg)', border:'1px solid var(--red-bd)', borderRadius:7, padding:'.55rem .8rem', fontSize:'.78rem', color:'var(--red)', textAlign:'center' }}>{error}</div>}
               <label style={{ display:'flex', alignItems:'center', gap:'.5rem', cursor:'pointer', fontSize:'.78rem', color:'var(--muted)' }}>
-                <input type="checkbox" checked={shouldTrust} onChange={e => setShouldTrust(e.target.checked)}
-                  style={{ width:14, height:14, accentColor:'#f97316' }}/>
+                <input type="checkbox" checked={shouldTrust} onChange={e => setShouldTrust(e.target.checked)} style={{ width:14, height:14, accentColor:'#f97316' }}/>
                 Trust this device for 30 days
               </label>
               <button type="submit" disabled={mfaLoading || mfaCode.length!==6}

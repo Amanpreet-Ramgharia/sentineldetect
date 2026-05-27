@@ -74,6 +74,7 @@ export default function RulesPage() {
   const [showPlay,    setShowPlay]    = useState(false)
   const [validation,  setValidation]  = useState<any>(null)
   const [editNote,  setEditNote]  = useState<string|null>(null)
+  const [reviewing, setReviewing] = useState<string|null>(null)
   const [noteVal,   setNoteVal]   = useState('')
 
   useEffect(() => { load() }, [])
@@ -159,6 +160,15 @@ export default function RulesPage() {
     setRules(p => p.map(r => r.id === rule.id ? {...r, note: noteVal} : r))
     if (sel?.id === rule.id) setSel(p => p ? {...p, note: noteVal} : null)
     setEditNote(null)
+  }
+
+  async function markReviewed(rule: DbRule) {
+    setReviewing(rule.id)
+    const now = new Date().toISOString()
+    await createClient().from('rules').update({ last_reviewed_at: now }).eq('id', rule.id)
+    setRules(p => p.map(r => r.id === rule.id ? {...r, last_reviewed_at: now} as any : r))
+    if (sel?.id === rule.id) setSel(p => p ? {...p, last_reviewed_at: now} as any : null)
+    setReviewing(null)
   }
 
   function dlSigma(r: DbRule) {
@@ -259,6 +269,13 @@ export default function RulesPage() {
                   {new Date(rule.created_at).toLocaleDateString()} · {rule.platform.split(' ')[0]}
                 </div>
                 {rule.note && <div style={{fontSize:'.65rem', color:'var(--muted)', marginTop:'.2rem', fontStyle:'italic'}}> {rule.note}</div>}
+                {(() => {
+                  const lr = (rule as any).last_reviewed_at
+                  const isStale = !lr || (Date.now() - new Date(lr).getTime()) > 90 * 86400000
+                  return isStale
+                    ? <div style={{fontSize:'.6rem', color:'#f97316', marginTop:'.2rem', display:'flex', alignItems:'center', gap:'.3rem'}}><span style={{width:5,height:5,borderRadius:'50%',background:'#f97316',display:'inline-block',flexShrink:0}}/> Needs review</div>
+                    : <div style={{fontSize:'.6rem', color:'var(--green)', marginTop:'.2rem'}}>Reviewed {new Date((rule as any).last_reviewed_at).toLocaleDateString()}</div>
+                })()}
               </div>
             )
           })}
@@ -448,6 +465,22 @@ export default function RulesPage() {
                     </button>
                   </div>
                 )}
+              </div>
+
+              {/* Rule Review */}
+              <div style={{padding:'.75rem 1.1rem', background:'rgba(34,197,94,.03)', borderTop:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'1rem', flexWrap:'wrap'}}>
+                <div>
+                  <div style={{fontSize:'.62rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'.09em', color:'var(--muted)', marginBottom:'.2rem'}}>Rule Review</div>
+                  <div style={{fontSize:'.72rem', color:'var(--muted2)'}}>
+                    {(sel as any).last_reviewed_at
+                      ? `Last reviewed ${new Date((sel as any).last_reviewed_at).toLocaleDateString()}`
+                      : 'Never reviewed — confirm this rule is still accurate and relevant'}
+                  </div>
+                </div>
+                <button onClick={() => markReviewed(sel)} disabled={reviewing === sel.id}
+                  style={{padding:'.4rem .9rem', borderRadius:7, border:'1px solid var(--green-bd)', background:'var(--green-bg)', color:'var(--green)', fontSize:'.75rem', cursor:'pointer', fontFamily:'inherit', flexShrink:0}}>
+                  {reviewing === sel.id ? 'Saving…' : (sel as any).last_reviewed_at ? 'Re-review' : 'Mark reviewed'}
+                </button>
               </div>
             </div>
           </div>

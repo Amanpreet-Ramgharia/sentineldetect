@@ -7,6 +7,7 @@ import type { Theme } from '@/lib/types'
 
 const NAV = [
   { href:'/home',         label:'Dashboard'       },
+  { href:'/soc',          label:'SOC'             },
   { href:'/generate',     label:'Generate'        },
   { href:'/rules',        label:'My Rules'        },
   { href:'/matrix',       label:'ATT&CK Coverage' },
@@ -19,7 +20,6 @@ const NAV = [
   { href:'/teams',        label:'Teams'           },
   { href:'/profile',      label:'Profile'         },
   { href:'/settings',     label:'Settings'        },
-  { href:'/report',       label:'Export PDF'      },
 ]
 
 const THEMES: { value: Theme; label: string }[] = [
@@ -34,12 +34,19 @@ const THEMES: { value: Theme; label: string }[] = [
 const BUG_URL = 'https://github.com/Amanpreet-Ramgharia/sentineldetect/issues/new?template=bug_report.md&title=Bug+report&body=**Page:**%0A%0A**What+happened:**%0A%0A**Expected:**%0A'
 
 const PAGE_TITLES: Record<string, string> = {
-  '/home':'Dashboard', '/generate':'Generate Detection Rule',
-  '/rules':'My Rules', '/matrix':'ATT&CK Coverage',
-  '/analyser':'Log Analyser', '/sigma':'Sigma Import',
-  '/threats':'Live Threats', '/templates':'Templates',
-  '/integrations':'Integrations', '/api-docs':'API Access',
-  '/teams':'Teams', '/settings':'Settings',
+  '/home':         'Dashboard',
+  '/soc':          'SOC — Alert Queue',
+  '/generate':     'Generate Detection Rule',
+  '/rules':        'My Rules',
+  '/matrix':       'ATT&CK Coverage',
+  '/analyser':     'Log Analyser',
+  '/sigma':        'Sigma Import',
+  '/threats':      'Live Threats',
+  '/templates':    'Templates',
+  '/integrations': 'Integrations',
+  '/api-docs':     'API Access',
+  '/teams':        'Teams',
+  '/settings':     'Settings',
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -62,7 +69,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return () => window.removeEventListener('resize', check)
   }, [])
 
-  // Close sidebar on route change (mobile)
   useEffect(() => { setSidebarOpen(false) }, [pathname])
 
   useEffect(() => {
@@ -125,10 +131,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div style={{ fontSize:'.58rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'.1em', color:'var(--muted2)', padding:'.1rem .38rem .45rem' }}>Navigation</div>
         {NAV.map(item => {
           const active = pathname === item.href || (item.href !== '/home' && pathname.startsWith(item.href))
+          const isSOC  = item.href === '/soc'
           return (
             <Link key={item.href} href={item.href} style={{ textDecoration:'none', display:'block' }}>
-              <div style={{ padding:'.48rem .75rem', borderRadius:6, marginBottom:'.15rem', fontSize:'.77rem', fontWeight:active?600:400, color:active?'#f97316':'var(--muted)', background:active?'rgba(249,115,22,.1)':'transparent', border:active?'1px solid rgba(249,115,22,.2)':'1px solid transparent', transition:'all .15s' }}>
+              <div style={{
+                padding:'.48rem .75rem',
+                borderRadius:6,
+                marginBottom:'.15rem',
+                fontSize:'.77rem',
+                fontWeight: active ? 600 : 400,
+                color: active ? '#f97316' : 'var(--muted)',
+                background: active ? 'rgba(249,115,22,.1)' : 'transparent',
+                border: active ? '1px solid rgba(249,115,22,.2)' : '1px solid transparent',
+                transition:'all .15s',
+                display:'flex',
+                alignItems:'center',
+                justifyContent:'space-between',
+              }}>
                 {item.label}
+                {/* NEW badge on SOC until first visit */}
+                {isSOC && !active && (
+                  <span style={{ fontSize:'.55rem', fontWeight:700, background:'rgba(249,115,22,.15)', color:'#f97316', borderRadius:4, padding:'.1rem .35rem', letterSpacing:'.05em' }}>NEW</span>
+                )}
               </div>
             </Link>
           )
@@ -169,16 +193,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div style={{ display:'flex', minHeight:'100vh', position:'relative', zIndex:1 }}>
-      {/* Mobile overlay backdrop */}
       {isMobile && sidebarOpen && (
         <div onClick={() => setSidebarOpen(false)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.5)', zIndex:199 }}/>
       )}
 
       {sidebar}
 
-      {/* Main */}
       <main style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', minWidth:0 }}>
-        {/* Header */}
         <div style={{ height:48, borderBottom:'1px solid var(--border)', background:'var(--header-bg)', backdropFilter:'blur(12px)', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 1rem', flexShrink:0, position:'sticky', top:0, zIndex:50, gap:'.75rem' }}>
           <div style={{ display:'flex', alignItems:'center', gap:'.75rem', minWidth:0 }}>
             {isMobile && (

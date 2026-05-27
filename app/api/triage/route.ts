@@ -1,31 +1,24 @@
-// app/api/triage/route.ts
-// Public endpoint — authenticated via sd_ API key, no session needed.
-// Accepts any JSON alert payload, runs AI triage, saves to soc_alerts.
-//
-// Usage:
-//   POST /api/triage
-//   Authorization: Bearer sd_your_key_here
-//   Content-Type: application/json
-//   Body: any JSON alert (raw Splunk alert, Sentinel incident, etc.)
-//
-//   Or wrap it: { "alert": {...}, "source": "splunk", "provider": "gemini" }
+// app/api/triage/route.ts — updated for Phase 3
+// Added: SIEM payload normalisation + Slack notification
 
-import { NextRequest, NextResponse } from 'next/server'
-import { runAI, parseJSON }          from '@/lib/ai'
+import { NextRequest, NextResponse }  from 'next/server'
+import { runAI, parseJSON }           from '@/lib/ai'
 import { TRIAGE_SYSTEM, TRIAGE_USER, type TriageResult } from '@/lib/ai/triage'
-import { createServiceClient }       from '@/lib/supabase/server'
-import { createHash }                from 'crypto'
-import type { Provider }             from '@/lib/types'
+import { createServiceClient }        from '@/lib/supabase/server'
+import { detectSource, normalizePayload } from '@/lib/integrations/parsers'
+import { sendSlackAlert }             from '@/lib/integrations/slack'
+import { createHash }                 from 'crypto'
+import type { Provider }              from '@/lib/types'
 
 export async function POST(req: NextRequest) {
   try {
-    // ── Auth ────────────────────────────────────────────────────────────────
+    // ── Auth ─────────────────────────────────────────────────────────────────
     const auth   = req.headers.get('authorization') || ''
     const rawKey = auth.replace('Bearer ', '').trim()
 
     if (!rawKey.startsWith('sd_')) {
       return NextResponse.json(
-        { error: 'Invalid API key format. Key must start with sd_. Get one at Settings → API Keys.' },
+        { error: 'Invalid API key. Key must start with sd_. Get one at Settings → API Keys.' },
         { status: 401 }
       )
     }
@@ -43,8 +36,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid or revoked API key' }, { status: 401 })
     }
 
-    await sb
-      .from('sd_api_keys')
+    await sb.from('sd_api_keys')
       .update({ last_used_at: new Date().toISOString() })
       .eq('id', keyRecord.id)
 
@@ -56,23 +48,39 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Request body must be valid JSON' }, { status: 400 })
     }
 
-    // Normalise alert text — accept any shape
-    let alertText: string
-    if (body.alert && typeof body.alert === 'string') {
-      alertText = body.alert
-    } else if (body.alert && typeof body.alert === 'object') {
-      alertText = JSON.stringify(body.alert, null, 2)
-    } else {
-      // Treat the whole body as the alert payload
-      alertText = JSON.stringify(body, null, 2)
-    }
-
-    if (alertText.trim().length < 5) {
-      return NextResponse.json({ error: 'Alert payload is empty' }, { status: 400 })
-    }
-
     const provider  = (body.provider as Provider) || 'gemini'
     const sourceTag = (body.source as string)     || 'api'
+
+    // Extract the actual alert data (support { alert: {...} } wrapper or raw payload)
+    let alertPayload: Record<string, unknown>
+    let rawAlertText: string | null = null
+
+    if (body.alert && typeof body.alert === 'string') {
+      rawAlertText = body.alert
+      alertPayload = body
+    } else if (body.alert && typeof body.alert === 'object') {
+      alertPayload = body.alert as Record<string, unknown>
+    } else {
+      alertPayload = body
+    }
+
+    // ── SIEM normalisation ───────────────────────────────────────────────────
+    // Auto-detect the source SIEM and normalise to clean structured text
+    // This dramatically improves AI triage quality vs raw JSON dumps
+    let alertText: string
+    let detectedSource = sourceTag
+
+    if (rawAlertText) {
+      alertText = rawAlertText
+    } else {
+      const siem = detectSource(alertPayload)
+      if (siem !== 'generic') detectedSource = siem
+      alertText = normalizePayload(alertPayload, siem)
+    }
+
+    if (!alertText || alertText.trim().length < 5) {
+      return NextResponse.json({ error: 'Alert payload is empty' }, { status: 400 })
+    }
 
     // ── AI triage ────────────────────────────────────────────────────────────
     const { raw, model_used } = await runAI(
@@ -98,12 +106,12 @@ export async function POST(req: NextRequest) {
         user_id:              keyRecord.user_id,
         team_id:              profile?.active_team_id ?? null,
         raw_payload:          body,
-        source:               sourceTag,
-        source_system:        triage.source_system || (body.source_system as string) || null,
-        title:                triage.title         || 'Untitled Alert',
-        severity:             triage.severity      || 'Medium',
-        severity_score:       triage.severity_score ?? 5,
-        summary:              triage.summary        || '',
+        source:               detectedSource,
+        source_system:        triage.source_system || (body.source_system as string) || detectedSource !== 'api' ? detectedSource : null,
+        title:                triage.title          || 'Untitled Alert',
+        severity:             triage.severity       || 'Medium',
+        severity_score:       triage.severity_score  ?? 5,
+        summary:              triage.summary         || '',
         mitre_technique:      triage.mitre_technique || '',
         mitre_tactic:         triage.mitre_tactic    || '',
         mitre_name:           triage.mitre_name      || '',
@@ -112,8 +120,8 @@ export async function POST(req: NextRequest) {
         response_actions:     triage.response_actions    || [],
         is_false_positive:    triage.is_false_positive   ?? false,
         false_positive_reason: triage.false_positive_reason || '',
-        escalate:             triage.escalate             ?? false,
-        escalation_reason:    triage.escalation_reason    || '',
+        escalate:             triage.escalate         ?? false,
+        escalation_reason:    triage.escalation_reason || '',
         status:               triage.is_false_positive ? 'false_positive' : 'new',
         alert_time:           (body.timestamp as string) || new Date().toISOString(),
       })
@@ -124,10 +132,22 @@ export async function POST(req: NextRequest) {
       console.error('[triage] DB save error:', saveError.message)
     }
 
-    return NextResponse.json({
-      alert:       saved ?? { ...triage },
-      model_used,
-    })
+    // ── Slack notification (async — don't block response) ─────────────────────
+    if (saved) {
+      sendSlackAlert(keyRecord.user_id, {
+        id:              saved.id,
+        title:           saved.title,
+        severity:        saved.severity,
+        summary:         saved.summary,
+        mitre_technique: saved.mitre_technique,
+        mitre_tactic:    saved.mitre_tactic,
+        source_system:   saved.source_system,
+        escalate:        saved.escalate,
+        is_false_positive: saved.is_false_positive,
+      }).catch(e => console.error('[triage] Slack notification failed:', e))
+    }
+
+    return NextResponse.json({ alert: saved ?? triage, model_used })
 
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Triage failed'

@@ -3,25 +3,31 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 const PROVIDERS = [
-  { key:'gemini',       name:'Google Gemini',    placeholder:'AIzaSy...', info:'Free tier — 500 req/day, no credit card', link:'https://aistudio.google.com/app/apikey' },
-  { key:'openai',       name:'OpenAI',           placeholder:'sk-...',    info:'Requires credits. gpt-4o-mini recommended', link:'https://platform.openai.com/api-keys' },
-  { key:'anthropic',    name:'Anthropic Claude', placeholder:'sk-ant-...',info:'Requires credits. Haiku recommended', link:'https://console.anthropic.com/settings/keys' },
-  { key:'groq',         name:'Groq',             placeholder:'gsk_...',   info:'Free tier — very fast inference', link:'https://console.groq.com/keys' },
-  { key:'virustotal',   name:'VirusTotal',        placeholder:'...',       info:'Free tier — 500 lookups/day. Enriches IPs and hashes in Log Analyser', link:'https://www.virustotal.com/gui/my-apikey' },
-  { key:'github',       name:'GitHub (Gist export)', placeholder:'ghp_...',  info:'Personal Access Token with gist scope. Lets you export rules directly to GitHub Gist', link:'https://github.com/settings/tokens/new?scopes=gist&description=SentinelDetect' },
+  { key:'gemini',       name:'Google Gemini',       placeholder:'AIzaSy...', info:'Free tier — 500 req/day, no credit card',                link:'https://aistudio.google.com/app/apikey' },
+  { key:'openai',       name:'OpenAI',              placeholder:'sk-...',    info:'Requires credits. gpt-4o-mini recommended',             link:'https://platform.openai.com/api-keys' },
+  { key:'anthropic',    name:'Anthropic Claude',    placeholder:'sk-ant-...',info:'Requires credits. Haiku recommended',                    link:'https://console.anthropic.com/settings/keys' },
+  { key:'groq',         name:'Groq',                placeholder:'gsk_...',   info:'Free tier — very fast inference',                        link:'https://console.groq.com/keys' },
+  { key:'virustotal',   name:'VirusTotal',          placeholder:'...',       info:'Free tier — 500 lookups/day. Enriches IPs in Log Analyser', link:'https://www.virustotal.com/gui/my-apikey' },
+  { key:'github',       name:'GitHub (Gist export)',placeholder:'ghp_...',   info:'Personal Access Token with gist scope',                  link:'https://github.com/settings/tokens/new?scopes=gist&description=SentinelDetect' },
 ]
 
 interface StoredKey { provider: string; masked: string; created_at: string }
-interface Factor { id: string; friendly_name: string; factor_type: string; status: string }
+interface Factor    { id: string; friendly_name: string; factor_type: string; status: string }
 
 export default function SettingsPage() {
-  const [keys,      setKeys]      = useState<StoredKey[]>([])
-  const [inputs,    setInputs]    = useState<Record<string,string>>({})
-  const [saving,    setSaving]    = useState<string|null>(null)
-  const [deleting,  setDeleting]  = useState<string|null>(null)
-  const [user,      setUser]      = useState<any>(null)
-  const [profile,   setProfile]   = useState<any>(null)
-  const [msg,       setMsg]       = useState<{ text:string; type:'ok'|'err' }|null>(null)
+  const [keys,         setKeys]         = useState<StoredKey[]>([])
+  const [inputs,       setInputs]       = useState<Record<string,string>>({})
+  const [saving,       setSaving]       = useState<string|null>(null)
+  const [deleting,     setDeleting]     = useState<string|null>(null)
+  const [user,         setUser]         = useState<any>(null)
+  const [profile,      setProfile]      = useState<any>(null)
+  const [msg,          setMsg]          = useState<{ text:string; type:'ok'|'err' }|null>(null)
+
+  // Slack state
+  const [slackSaved,   setSlackSaved]   = useState<string|null>(null)
+  const [slackInput,   setSlackInput]   = useState('')
+  const [slackSaving,  setSlackSaving]  = useState(false)
+  const [slackTesting, setSlackTesting] = useState(false)
 
   // MFA state
   const [mfaFactors,   setMfaFactors]   = useState<Factor[]>([])
@@ -48,12 +54,20 @@ export default function SettingsPage() {
     const { data: p } = await sb.from('profiles').select('*').eq('id', user.id).single()
     setProfile(p)
     const { data } = await sb.from('user_api_keys').select('provider,api_key,created_at').eq('user_id', user.id)
-    setKeys((data || []).map((k: any) => ({
-      provider: k.provider,
-      masked: k.api_key.substring(0, 8) + '••••••••' + k.api_key.slice(-4),
-      created_at: k.created_at,
-    })))
-    // Load MFA factors
+    const allKeys = data || []
+
+    // Separate Slack from regular API keys
+    const slackKey = allKeys.find((k: any) => k.provider === 'slack_webhook')
+    setSlackSaved(slackKey ? slackKey.api_key : null)
+
+    setKeys(allKeys
+      .filter((k: any) => k.provider !== 'slack_webhook')
+      .map((k: any) => ({
+        provider:   k.provider,
+        masked:     k.api_key.substring(0, 8) + '••••••••' + k.api_key.slice(-4),
+        created_at: k.created_at,
+      }))
+    )
     const { data: mfa } = await sb.auth.mfa.listFactors()
     setMfaFactors((mfa?.totp || []) as Factor[])
   }
@@ -82,16 +96,55 @@ export default function SettingsPage() {
     setDeleting(null); load()
   }
 
+  async function saveSlack() {
+    const url = slackInput.trim()
+    if (!url.startsWith('https://hooks.slack.com/')) {
+      flash('Must be a valid Slack webhook URL (https://hooks.slack.com/...)', 'err'); return
+    }
+    setSlackSaving(true)
+    const sb = createClient()
+    const { data: { user } } = await sb.auth.getUser()
+    if (!user) return
+    const { error } = await sb.from('user_api_keys').upsert(
+      { user_id: user.id, provider: 'slack_webhook', api_key: url },
+      { onConflict: 'user_id,provider' }
+    )
+    if (error) { flash(error.message, 'err'); setSlackSaving(false); return }
+    flash('Slack webhook saved — you will now receive alert notifications')
+    setSlackInput(''); setSlackSaving(false); load()
+  }
+
+  async function testSlack() {
+    const url = slackSaved
+    if (!url) return
+    setSlackTesting(true)
+    const res = await fetch('/api/integrations/slack/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ webhook_url: url }),
+    })
+    if (res.ok) flash('Test message sent to Slack')
+    else flash('Failed to send test message — check your webhook URL', 'err')
+    setSlackTesting(false)
+  }
+
+  async function removeSlack() {
+    if (!confirm('Remove Slack notifications?')) return
+    const sb = createClient()
+    const { data: { user } } = await sb.auth.getUser()
+    if (!user) return
+    await sb.from('user_api_keys').delete().eq('user_id', user.id).eq('provider', 'slack_webhook')
+    flash('Slack webhook removed')
+    load()
+  }
+
   async function enrollMFA() {
     setMfaEnrolling(true)
     const sb = createClient()
     const { data, error } = await sb.auth.mfa.enroll({ factorType: 'totp' })
     if (error || !data) { flash(error?.message || 'MFA enroll failed', 'err'); setMfaEnrolling(false); return }
-    setMfaQR(data.totp.qr_code)
-    setMfaSecret(data.totp.secret)
-    setMfaFactorId(data.id)
-    setMfaStep('scan')
-    setMfaEnrolling(false)
+    setMfaQR(data.totp.qr_code); setMfaSecret(data.totp.secret); setMfaFactorId(data.id)
+    setMfaStep('scan'); setMfaEnrolling(false)
   }
 
   async function verifyMFA() {
@@ -111,8 +164,7 @@ export default function SettingsPage() {
     const sb = createClient()
     const { error } = await sb.auth.mfa.unenroll({ factorId })
     if (error) { flash(error.message, 'err'); return }
-    flash('MFA disabled')
-    load()
+    flash('MFA disabled'); load()
   }
 
   async function updateProfile(e: React.FormEvent) {
@@ -120,13 +172,11 @@ export default function SettingsPage() {
     const sb = createClient()
     const name = (e.target as any).full_name?.value
     await sb.from('profiles').update({ full_name: name }).eq('id', user.id)
-    flash('Profile updated')
-    load()
+    flash('Profile updated'); load()
   }
 
-  const inp: React.CSSProperties = { flex:1, background:'var(--bg)', border:'1px solid var(--border2)', borderRadius:7, padding:'.5rem .8rem', color:'var(--text)', fontSize:'.82rem', outline:'none', fontFamily:'inherit' }
+  const inp: React.CSSProperties  = { flex:1, background:'var(--bg)', border:'1px solid var(--border2)', borderRadius:7, padding:'.5rem .8rem', color:'var(--text)', fontSize:'.82rem', outline:'none', fontFamily:'inherit' }
   const sBtn = (active: boolean): React.CSSProperties => ({ padding:'.45rem .9rem', borderRadius:7, border:'none', background:active?'#f97316':'var(--muted2)', color:'#fff', fontSize:'.78rem', fontWeight:600, cursor:active?'pointer':'not-allowed', fontFamily:'inherit', flexShrink:0 })
-
   const mfaEnabled = mfaFactors.some(f => f.status === 'verified')
 
   return (
@@ -160,7 +210,6 @@ export default function SettingsPage() {
             </button>
           )}
         </div>
-
         {mfaEnabled && mfaFactors.map(f => (
           <div key={f.id} style={{ padding:'.75rem 1.1rem', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
             <div>
@@ -173,19 +222,14 @@ export default function SettingsPage() {
             </button>
           </div>
         ))}
-
         {mfaStep === 'scan' && (
           <div style={{ padding:'1.1rem', borderTop:'1px solid var(--border)' }}>
             <div style={{ fontSize:'.82rem', fontWeight:600, color:'var(--text)', marginBottom:'.75rem' }}>Step 1 — Scan this QR code with your authenticator app</div>
             <div style={{ display:'flex', gap:'1.5rem', alignItems:'flex-start', flexWrap:'wrap' }}>
               <img src={mfaQR} alt="MFA QR Code" style={{ width:160, height:160, borderRadius:8, border:'4px solid #fff' }}/>
               <div style={{ flex:1, minWidth:200 }}>
-                <div style={{ fontSize:'.75rem', color:'var(--muted)', marginBottom:'.5rem' }}>
-                  Scan with Google Authenticator, Authy, or any TOTP app. Or enter the secret manually:
-                </div>
-                <code style={{ fontSize:'.72rem', fontFamily:'monospace', background:'var(--bg)', padding:'.45rem .75rem', borderRadius:6, border:'1px solid var(--border)', display:'block', wordBreak:'break-all', color:'var(--text)', marginBottom:'1rem' }}>
-                  {mfaSecret}
-                </code>
+                <div style={{ fontSize:'.75rem', color:'var(--muted)', marginBottom:'.5rem' }}>Scan with Google Authenticator, Authy, or any TOTP app. Or enter the secret manually:</div>
+                <code style={{ fontSize:'.72rem', fontFamily:'monospace', background:'var(--bg)', padding:'.45rem .75rem', borderRadius:6, border:'1px solid var(--border)', display:'block', wordBreak:'break-all', color:'var(--text)', marginBottom:'1rem' }}>{mfaSecret}</code>
                 <div style={{ fontSize:'.82rem', fontWeight:600, color:'var(--text)', marginBottom:'.4rem' }}>Step 2 — Enter the 6-digit code from your app</div>
                 <div style={{ display:'flex', gap:'.5rem' }}>
                   <input value={mfaCode} onChange={e => setMfaCode(e.target.value.replace(/\D/g,'').slice(0,6))}
@@ -205,6 +249,50 @@ export default function SettingsPage() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* ── Notifications (Slack) ──────────────────────────────────────────── */}
+      <div style={{ background:'var(--bg4)', border:`1px solid ${slackSaved ? 'var(--green-bd)' : 'var(--border)'}`, borderRadius:14, overflow:'hidden', marginBottom:'1.25rem' }}>
+        <div style={{ padding:'.85rem 1.1rem', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'.5rem' }}>
+          <div>
+            <div style={{ display:'flex', alignItems:'center', gap:'.5rem', marginBottom:'.2rem' }}>
+              <span style={{ fontSize:'.88rem', fontWeight:600, color:'var(--text)' }}>Slack Notifications</span>
+              {slackSaved && <span style={{ fontSize:'.62rem', padding:'.1rem .45rem', borderRadius:4, background:'var(--green-bg)', color:'var(--green)', border:'1px solid var(--green-bd)', fontWeight:600 }}>Connected</span>}
+            </div>
+            <div style={{ fontSize:'.75rem', color:'var(--muted)', lineHeight:1.5 }}>
+              Get a rich alert card in Slack every time an alert is triaged by the SOC.
+              {' '}<a href="https://api.slack.com/messaging/webhooks" target="_blank" rel="noopener" style={{ color:'#f97316', textDecoration:'none' }}>Create a webhook →</a>
+            </div>
+          </div>
+        </div>
+        <div style={{ padding:'.9rem 1.1rem' }}>
+          {slackSaved ? (
+            <div style={{ display:'flex', alignItems:'center', gap:'.65rem', flexWrap:'wrap' }}>
+              <code style={{ fontSize:'.72rem', fontFamily:'monospace', color:'var(--muted2)', background:'var(--bg)', padding:'.2rem .5rem', borderRadius:4, border:'1px solid var(--border)' }}>
+                {slackSaved.slice(0, 40)}…
+              </code>
+              <button onClick={testSlack} disabled={slackTesting}
+                style={{ fontSize:'.75rem', padding:'.3rem .75rem', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--muted)', cursor:'pointer', fontFamily:'inherit' }}>
+                {slackTesting ? 'Sending…' : 'Send test'}
+              </button>
+              <button onClick={removeSlack}
+                style={{ fontSize:'.7rem', padding:'.2rem .55rem', borderRadius:5, border:'1px solid var(--red-bd)', background:'var(--red-bg)', color:'var(--red)', cursor:'pointer', fontFamily:'inherit' }}>
+                Remove
+              </button>
+            </div>
+          ) : (
+            <div style={{ display:'flex', gap:'.5rem' }}>
+              <input type="url" value={slackInput} onChange={e => setSlackInput(e.target.value)}
+                placeholder="https://hooks.slack.com/services/T.../B.../..." style={inp}
+                onFocus={e => e.target.style.borderColor='rgba(249,115,22,.5)'}
+                onBlur={e => e.target.style.borderColor='var(--border2)'}
+                onKeyDown={e => e.key === 'Enter' && saveSlack()}/>
+              <button onClick={saveSlack} disabled={slackSaving || !slackInput.trim()} style={sBtn(!!(slackInput.trim()) && !slackSaving)}>
+                {slackSaving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* API Keys */}

@@ -34,7 +34,7 @@ Tactic: ${rule.tactic}
 Severity: ${rule.severity}
 Description: ${rule.description}`
 
-    const { raw, model_used } = await runAI(system, userPrompt)
+    const { raw, model_used } = await runAI(system, userPrompt, 'gemini', user.id)
     const playbook = parseJSON<Record<string, unknown>>(raw)
     return NextResponse.json({ playbook, model_used })
   } catch (err: unknown) {

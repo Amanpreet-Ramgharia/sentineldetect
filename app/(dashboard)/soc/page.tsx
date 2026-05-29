@@ -183,12 +183,16 @@ export default function SocPage() {
   }
 
   // ── Playbook actions ───────────────────────────────────────────────────────
+  const [genError, setGenError] = useState('')
   async function generatePlaybook() {
-    if (!genMitre.trim()) return; setGenerating(true)
-    const r = await fetch('/api/soc/playbooks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mitre_technique: genMitre, mitre_tactic: genTactic, context: genCtx }) })
-    const d = await r.json()
-    if (r.ok) { setPlaybooks(p => [d.playbook, ...p]); setSelPb(d.playbook); setShowGenForm(false); setGenMitre(''); setGenTactic(''); setGenCtx('') }
-    setGenerating(false)
+    if (!genMitre.trim()) return; setGenerating(true); setGenError('')
+    try {
+      const r = await fetch('/api/soc/playbooks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mitre_technique: genMitre, mitre_tactic: genTactic, context: genCtx }) })
+      const d = await r.json()
+      if (!r.ok) { setGenError(d.error || 'Generation failed — check your Gemini API key in Settings'); return }
+      setPlaybooks(p => [d.playbook, ...p]); setSelPb(d.playbook); setShowGenForm(false); setGenMitre(''); setGenTactic(''); setGenCtx('')
+    } catch (e: any) { setGenError(e.message || 'Network error') }
+    finally { setGenerating(false) }
   }
   async function deletePlaybook(id: string) {
     if (!confirm('Delete this playbook?')) return
@@ -502,6 +506,7 @@ export default function SocPage() {
                 placeholder="Optional context — paste alert summary, threat intel, or describe the specific scenario…"
                 rows={2} style={{ ...inp, resize: 'vertical', marginBottom: '.65rem' }} />
               <div style={{ display: 'flex', gap: '.65rem', alignItems: 'center' }}>
+                {genError && <div style={{ color:'var(--red)', fontSize:'.78rem', marginBottom:'.5rem', padding:'.5rem .75rem', background:'var(--red-bg)', borderRadius:7, border:'1px solid var(--red-bd)' }}>{genError}</div>}
                 <button onClick={generatePlaybook} disabled={generating || !genMitre.trim()}
                   style={{ padding: '.55rem 1.25rem', borderRadius: 8, background: generating || !genMitre ? 'var(--muted2)' : '#f97316', border: 'none', color: '#fff', fontWeight: 700, fontSize: '.85rem', cursor: generating || !genMitre ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
                   {generating ? 'Generating…' : `Generate playbook${genMitre ? ` for ${genMitre}` : ''}`}

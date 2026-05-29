@@ -15,6 +15,23 @@ const PLATFORM_CONTEXT: Record<string, string> = {
   'IBM QRadar (AQL)': 'IBM QRadar AQL (Ariel Query Language). Tables: events, flows. Key fields: QIDNAME(qid), sourceip, destinationip, username, EventID. Use LAST 1 HOURS for time filters.',
 }
 
+// Environment context string builder
+export interface GenerationContext {
+  os?:        string    // e.g. "Windows Active Directory"
+  logs?:      string[]  // e.g. ["Sysmon", "Windows Security"]
+  env_size?:  string    // e.g. "Enterprise (5000+ users)"
+}
+
+function buildContextString(ctx?: GenerationContext): string {
+  if (!ctx || (!ctx.os && !ctx.logs?.length && !ctx.env_size)) return ''
+  const lines: string[] = ['\nEnvironment context (use to improve field accuracy):']
+  if (ctx.os)             lines.push(`- Target environment: ${ctx.os}`)
+  if (ctx.logs?.length)   lines.push(`- Available log sources: ${ctx.logs.join(', ')}`)
+  if (ctx.env_size)       lines.push(`- Environment scale: ${ctx.env_size}`)
+  lines.push('Ensure the rule uses field names and event IDs that exist in these log sources.')
+  return lines.join('\n')
+}
+
 export const GENERATE_SYSTEM = (platform: Platform) => `You are a senior detection engineer with 10+ years experience building production ${platform} detection rules.
 Platform context: ${PLATFORM_CONTEXT[platform] || platform}
 
@@ -30,11 +47,12 @@ ${JSON_ONLY}
 Required JSON schema:
 {"title":string,"mitre_id":string,"mitre_name":string,"tactic":string,"severity":"Critical"|"High"|"Medium"|"Low","confidence":number(0-100),"data_source":string,"platform":"${platform}","rule":string,"description":string,"false_positives":string[],"tuning_tips":string[],"response_steps":string[]}`
 
-export const GENERATE_USER = (scenario: string, platform: Platform, focus?: string) =>
+export const GENERATE_USER = (scenario: string, platform: Platform, focus?: string, context?: GenerationContext) =>
 `Generate a detection rule for ${platform}.
 
 Scenario: ${scenario}
 ${focus && focus !== 'any' ? `MITRE Tactic hint: ${focus}` : ''}
+${buildContextString(context)}
 
 The "rule" field must contain the complete, syntactically correct ${platform} query ready for production deployment.
 Return only the JSON object.`

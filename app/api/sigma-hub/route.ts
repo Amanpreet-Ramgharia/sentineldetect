@@ -22,12 +22,12 @@ async function cachedFetch(url: string, opts?: RequestInit) {
 // SigmaHQ category → GitHub path + display label
 const CATEGORIES: Record<string, string> = {
   'windows/process_creation': 'rules/windows/process_creation',
-  'windows/registry':         'rules/windows/registry_event',
+  'windows/registry':         'rules/windows/registry',
   'windows/network':          'rules/windows/network_connection',
   'windows/file':             'rules/windows/file_event',
   'windows/powershell':       'rules/windows/powershell',
-  'linux/process':            'rules/linux/process_creation',
-  'cloud/aws':                'rules/cloud/aws/cloudtrail',
+  'linux/process':            'rules/linux/auditd',
+  'cloud/aws':                'rules/cloud/aws',
   'cloud/azure':              'rules/cloud/azure',
   'network/dns':              'rules/network/dns',
   'web/webserver':            'rules/web/webserver',
@@ -110,9 +110,19 @@ export async function GET(req: NextRequest) {
     }
 
     if (action === 'fetch' && file) {
-      const content = await cachedFetch(file)  // file = download_url
-      const yamlStr = typeof content === 'string' ? content : await (await fetch(file)).text()
-      const parsed  = parseSigmaYaml(typeof yamlStr === 'string' ? yamlStr : JSON.stringify(yamlStr))
+      // YAML files are plain text — must NOT use cachedFetch (which calls .json())
+      const now = Date.now()
+      const hit = cache.get('raw:' + file)
+      let yamlStr: string
+      if (hit && now - hit.ts < CACHE_TTL) {
+        yamlStr = hit.data as string
+      } else {
+        const r = await fetch(file, { headers: { 'User-Agent': 'SentinelDetect/4.0' } })
+        if (!r.ok) throw new Error(`Failed to fetch rule file: ${r.status}`)
+        yamlStr = await r.text()
+        cache.set('raw:' + file, { data: yamlStr, ts: now })
+      }
+      const parsed = parseSigmaYaml(yamlStr)
       return NextResponse.json({ parsed, raw: yamlStr })
     }
 

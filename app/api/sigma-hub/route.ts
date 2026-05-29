@@ -22,15 +22,15 @@ async function cachedFetch(url: string, opts?: RequestInit) {
 // SigmaHQ category → GitHub path + display label
 const CATEGORIES: Record<string, string> = {
   'windows/process_creation': 'rules/windows/process_creation',
-  'windows/registry':         'rules/windows/registry',
+  'windows/registry':         'rules/windows/registry_event',
   'windows/network':          'rules/windows/network_connection',
   'windows/file':             'rules/windows/file_event',
   'windows/powershell':       'rules/windows/powershell',
-  'linux/process':            'rules/linux/auditd',
-  'cloud/aws':                'rules/cloud/aws',
+  'linux/process':            'rules/linux/process_creation',
+  'cloud/aws':                'rules/cloud/aws/cloudtrail',
   'cloud/azure':              'rules/cloud/azure',
   'network/dns':              'rules/network/dns',
-  'web/webserver':            'rules/web',
+  'web/webserver':            'rules/web/webserver',
 }
 
 const GH_BASE = 'https://api.github.com/repos/SigmaHQ/sigma'

@@ -132,7 +132,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <nav style={{ padding:'.6rem .65rem', flex:1 }}>
         <div style={{ fontSize:'.58rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'.1em', color:'var(--muted2)', padding:'.1rem .38rem .45rem' }}>Navigation</div>
         {NAV.map(item => {
-          const active = pathname === item.href || (item.href !== '/home' && pathname.startsWith(item.href))
+          const active = pathname === item.href || (item.href !== '/home' && pathname.startsWith(item.href + '/'))
           const isSOC  = item.href === '/soc'
           return (
             <Link key={item.href} href={item.href} style={{ textDecoration:'none', display:'block' }}>

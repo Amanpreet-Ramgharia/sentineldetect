@@ -20,17 +20,26 @@ async function cachedFetch(url: string, opts?: RequestInit) {
 }
 
 // SigmaHQ category → GitHub path + display label
+// Verified against SigmaHQ main branch May 2026
 const CATEGORIES: Record<string, string> = {
   'windows/process_creation': 'rules/windows/process_creation',
-  'windows/registry':         'rules/windows/registry',
+  'windows/registry':         'rules/windows/registry_event',
   'windows/network':          'rules/windows/network_connection',
   'windows/file':             'rules/windows/file_event',
   'windows/powershell':       'rules/windows/powershell',
-  'linux/process':            'rules/linux/auditd',
+  'linux/process':            'rules/linux/process_creation',
   'cloud/aws':                'rules/cloud/aws',
   'cloud/azure':              'rules/cloud/azure',
   'network/dns':              'rules/network/dns',
-  'web/webserver':            'rules/web/webserver',
+  'web/webserver':            'rules/web/apache',
+}
+
+// Fallback paths if primary 404s
+const CATEGORY_FALLBACKS: Record<string, string[]> = {
+  'windows/registry': ['rules/windows/registry_event','rules/windows/registry_add','rules/windows/registry_set','rules/windows/registry'],
+  'linux/process':    ['rules/linux/process_creation','rules/linux/auditd'],
+  'web/webserver':    ['rules/web/apache','rules/web/iis','rules/web/webserver','rules/web'],
+  'cloud/aws':        ['rules/cloud/aws','rules/cloud/aws/cloudtrail'],
 }
 
 const GH_BASE = 'https://api.github.com/repos/SigmaHQ/sigma'
@@ -87,8 +96,23 @@ export async function GET(req: NextRequest) {
 
   try {
     if (action === 'list') {
-      const path  = CATEGORIES[category] || CATEGORIES['windows/process_creation']
-      const items = await cachedFetch(`${GH_BASE}/contents/${path}`)
+      const primaryPath = CATEGORIES[category] || CATEGORIES['windows/process_creation']
+      const fallbacks   = CATEGORY_FALLBACKS[category] || []
+      const pathsToTry  = [primaryPath, ...fallbacks.filter(p => p !== primaryPath)]
+      
+      let items: any = null
+      let lastError = ''
+      for (const path of pathsToTry) {
+        try {
+          items = await cachedFetch(`${GH_BASE}/contents/${path}`)
+          break  // success
+        } catch (e: any) {
+          lastError = e.message
+          cache.delete(`${GH_BASE}/contents/${path}`)  // clear bad cache entry
+          continue
+        }
+      }
+      if (!items) throw new Error(lastError || 'All paths returned 404')
 
       let rules = (Array.isArray(items) ? items : [])
         .filter((f: any) => f.name?.endsWith('.yml') || f.name?.endsWith('.yaml'))
